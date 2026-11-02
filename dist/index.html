@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Desco Keyboard: juego gratuito de mecanografía en español con combate stickman."
+    />
+    <meta name="theme-color" content="#070912" />
+    <title>Desco Keyboard · Entrena escribiendo</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Inicio de Desco Keyboard">
+          <span class="brand-mark" aria-hidden="true">DK</span>
+          <span>
+            <strong>Desco Keyboard</strong>
+            <small>Entrenamiento de mecanografía</small>
+          </span>
+        </a>
+
+        <nav class="top-actions" aria-label="Controles del juego">
+          <button class="icon-button" id="helpButton" type="button">Cómo jugar</button>
+          <button class="icon-button" id="soundButton" type="button" aria-pressed="true">Sonido: sí</button>
+          <button class="icon-button" id="fullscreenButton" type="button">Pantalla completa</button>
+        </nav>
+      </header>
+
+      <section class="game-frame" aria-labelledby="gameTitle">
+        <div class="game-heading">
+          <div>
+            <p class="eyebrow">ESCRIBE · ATACA · APRENDE</p>
+            <h1 id="gameTitle">Cada palabra activa un golpe</h1>
+          </div>
+          <div class="best-score" aria-live="polite">
+            <span>Mejor marca</span>
+            <strong id="bestWpm">0 PPM</strong>
+          </div>
+        </div>
+
+        <div class="arena-wrap" id="arenaWrap">
+          <canvas id="arena" width="1280" height="720" aria-label="Arena de combate stickman"></canvas>
+
+          <div class="hud" id="hud" aria-hidden="true">
+            <div class="fighter-hud player-hud">
+              <div class="hud-label"><span>DESCO</span><strong id="playerHpText">100</strong></div>
+              <div class="health-track"><span id="playerHealth"></span></div>
+            </div>
+            <div class="round-badge">
+              <span id="waveText">OLEADA 1/3</span>
+              <strong id="comboText">x0</strong>
+            </div>
+            <div class="fighter-hud enemy-hud">
+              <div class="hud-label"><strong id="enemyHpText">100</strong><span id="enemyName">SOMBRA</span></div>
+              <div class="health-track"><span id="enemyHealth"></span></div>
+            </div>
+          </div>
+
+          <section class="start-panel" id="startPanel" aria-label="Menú principal">
+            <p class="eyebrow">DESCO PRESENTA</p>
+            <h2>KEYBOARD<br /><span>FIGHTER</span></h2>
+            <p class="start-copy">Domina el teclado en español mientras ganas cada combate.</p>
+
+            <div class="difficulty-grid" role="group" aria-label="Selecciona la dificultad">
+              <button class="difficulty active" type="button" data-level="novato">
+                <span>01</span><strong>Novato</strong><small>Palabras cotidianas · sin prisa</small>
+              </button>
+              <button class="difficulty" type="button" data-level="intermedio">
+                <span>02</span><strong>Intermedio</strong><small>Acentos y frases · ritmo medio</small>
+              </button>
+              <button class="difficulty" type="button" data-level="experto">
+                <span>03</span><strong>Experto</strong><small>Precisión alta · rivales rápidos</small>
+              </button>
+            </div>
+
+            <button class="primary-button" id="startButton" type="button">INICIAR ENTRENAMIENTO</button>
+            <p class="keyboard-note">Usa un teclado físico para obtener la mejor experiencia.</p>
+          </section>
+
+          <section class="pause-panel hidden" id="pausePanel" aria-label="Juego en pausa">
+            <p class="eyebrow">ENTRENAMIENTO EN PAUSA</p>
+            <h2>Respira. Ajusta tus manos.</h2>
+            <p>Coloca los índices sobre las teclas <kbd>F</kbd> y <kbd>J</kbd>.</p>
+            <button class="primary-button" id="resumeButton" type="button">CONTINUAR</button>
+            <button class="text-button" id="exitButton" type="button">Volver al menú</button>
+          </section>
+
+          <section class="result-panel hidden" id="resultPanel" aria-live="polite">
+            <p class="eyebrow" id="resultEyebrow">ENTRENAMIENTO COMPLETADO</p>
+            <h2 id="resultTitle">¡Gran combate!</h2>
+            <div class="result-stats">
+              <div><span>Velocidad</span><strong id="resultWpm">0</strong><small>PPM</small></div>
+              <div><span>Precisión</span><strong id="resultAccuracy">0</strong><small>%</small></div>
+              <div><span>Mejor combo</span><strong id="resultCombo">0</strong><small>palabras</small></div>
+            </div>
+            <button class="primary-button" id="retryButton" type="button">VOLVER A ENTRENAR</button>
+            <button class="text-button" id="menuButton" type="button">Elegir nivel</button>
+          </section>
+        </div>
+
+        <section class="typing-deck" id="typingDeck" aria-label="Área de escritura">
+          <div class="live-stats">
+            <div><span>PPM</span><strong id="wpmValue">0</strong></div>
+            <div><span>Precisión</span><strong id="accuracyValue">100%</strong></div>
+            <div><span>Rango</span><strong id="rankValue">D</strong></div>
+          </div>
+
+          <div class="word-zone" id="wordZone">
+            <p class="lesson-label" id="lessonLabel">Selecciona un nivel para comenzar</p>
+            <div class="word-line" id="wordLine" aria-live="polite">
+              <span class="current-word"><span id="typedWord"></span><span id="remainingWord">preparado</span></span>
+              <span class="next-word" id="nextWord">para escribir</span>
+            </div>
+            <div class="progress-track"><span id="lessonProgress"></span></div>
+          </div>
+
+          <label class="input-shell" for="typingInput">
+            <span>Escribe aquí</span>
+            <input
+              id="typingInput"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="none"
+              spellcheck="false"
+              disabled
+              placeholder="Comienza el entrenamiento…"
+            />
+            <kbd>ESPACIO</kbd>
+          </label>
+        </section>
+      </section>
+
+      <section class="feature-strip" aria-label="Características">
+        <article><strong>100% en español</strong><span>Palabras, acentos y frases pensadas para practicar.</span></article>
+        <article><strong>Progreso local</strong><span>Tus mejores marcas se guardan únicamente en este navegador.</span></article>
+        <article><strong>Código abierto</strong><span>HTML5 Canvas, CSS y JavaScript sin librerías pesadas.</span></article>
+      </section>
+
+      <footer>
+        <span>Desco Keyboard · Creado por Josué Villarruel · © 2026 JV</span>
+        <span>Inspirado en los juegos clásicos de combate stickman.</span>
+      </footer>
+    </main>
+
+    <dialog id="helpDialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <div><p class="eyebrow">GUÍA RÁPIDA</p><h2>Cómo jugar</h2></div>
+          <button class="close-button" value="close" aria-label="Cerrar">×</button>
+        </div>
+        <ol>
+          <li><strong>Escribe la palabra iluminada.</strong><span>Cada letra correcta activa un ataque ligero.</span></li>
+          <li><strong>Presiona espacio al terminar.</strong><span>Una palabra limpia lanza un golpe especial y aumenta el combo.</span></li>
+          <li><strong>Cuida la precisión.</strong><span>Un error abre tu defensa y el rival contraataca.</span></li>
+          <li><strong>Sube tu rango.</strong><span>Encadena palabras para avanzar de D hasta SS.</span></li>
+        </ol>
+        <p class="tip">Consejo: mira la palabra, no tus manos. Las marcas de F y J te ayudan a volver a la posición inicial.</p>
+      </form>
+    </dialog>
+
+    <script src="game.js"></script>
+  </body>
+</html>
