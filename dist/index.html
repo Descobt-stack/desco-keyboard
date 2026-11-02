@@ -42,6 +42,16 @@
         </div>
 
         <div class="arena-wrap" id="arenaWrap">
+          <div class="arena-toolbar" aria-label="Menú de la arena">
+            <div class="arena-controls">
+              <button type="button" id="homeGameButton">Inicio</button>
+              <button type="button" id="pauseGameButton">Pausa</button>
+              <button type="button" id="settingsGameButton">Ajustes</button>
+              <button type="button" id="helpGameButton">Cómo jugar</button>
+            </div>
+            <span>ENTRENAMIENTO POR SECCIONES</span>
+          </div>
+
           <canvas id="arena" width="1280" height="720" aria-label="Arena de combate stickman"></canvas>
 
           <div class="hud" id="hud" aria-hidden="true">
@@ -66,7 +76,7 @@
 
             <div class="difficulty-grid" role="group" aria-label="Selecciona la dificultad">
               <button class="difficulty active" type="button" data-level="novato">
-                <span>01</span><strong>Novato</strong><small>Palabras cotidianas · sin prisa</small>
+                <span>01</span><strong>Novato</strong><small>Frases cortas · sin prisa</small>
               </button>
               <button class="difficulty" type="button" data-level="intermedio">
                 <span>02</span><strong>Intermedio</strong><small>Acentos y frases · ritmo medio</small>
@@ -99,39 +109,43 @@
             <button class="primary-button" id="retryButton" type="button">VOLVER A ENTRENAR</button>
             <button class="text-button" id="menuButton" type="button">Elegir nivel</button>
           </section>
-        </div>
 
-        <section class="typing-deck" id="typingDeck" aria-label="Área de escritura">
-          <div class="live-stats">
-            <div><span>PPM</span><strong id="wpmValue">0</strong></div>
-            <div><span>Precisión</span><strong id="accuracyValue">100%</strong></div>
-            <div><span>Rango</span><strong id="rankValue">D</strong></div>
-          </div>
-
-          <div class="word-zone" id="wordZone">
-            <p class="lesson-label" id="lessonLabel">Selecciona un nivel para comenzar</p>
-            <div class="word-line" id="wordLine" aria-live="polite">
-              <span class="current-word"><span id="typedWord"></span><span id="remainingWord">preparado</span></span>
-              <span class="next-word" id="nextWord">para escribir</span>
+          <section class="typing-deck" id="typingDeck" aria-label="Área de escritura">
+            <div class="live-stats">
+              <div><span>PPM</span><strong id="wpmValue">0</strong></div>
+              <div><span>Precisión</span><strong id="accuracyValue">100%</strong></div>
+              <div><span>Rango</span><strong id="rankValue">D</strong></div>
             </div>
-            <div class="progress-track"><span id="lessonProgress"></span></div>
-          </div>
 
-          <label class="input-shell" for="typingInput">
-            <span>Escribe aquí</span>
-            <input
-              id="typingInput"
-              type="text"
-              inputmode="text"
-              autocomplete="off"
-              autocapitalize="none"
-              spellcheck="false"
-              disabled
-              placeholder="Comienza el entrenamiento…"
-            />
-            <kbd>ESPACIO</kbd>
-          </label>
-        </section>
+            <div class="word-zone" id="wordZone">
+              <div class="sentence-meta">
+                <span id="sentenceCount">FRASE 1/3</span>
+                <span id="lessonLabel">Selecciona un nivel para comenzar</span>
+                <span id="streakLabel">RACHA PERFECTA 0</span>
+              </div>
+              <div class="sentence-line" id="sentenceLine" aria-live="polite">
+                <span class="sentence-current">preparado</span>
+                <span>para escribir una frase</span>
+              </div>
+              <div class="progress-track"><span id="lessonProgress"></span></div>
+            </div>
+
+            <label class="input-shell" for="typingInput">
+              <span>Palabra actual</span>
+              <input
+                id="typingInput"
+                type="text"
+                inputmode="text"
+                autocomplete="off"
+                autocapitalize="none"
+                spellcheck="false"
+                disabled
+                placeholder="Comienza el entrenamiento…"
+              />
+              <kbd>ESPACIO</kbd>
+            </label>
+          </section>
+        </div>
       </section>
 
       <section class="feature-strip" aria-label="Características">
@@ -156,9 +170,23 @@
           <li><strong>Escribe la palabra iluminada.</strong><span>Cada letra correcta activa un ataque ligero.</span></li>
           <li><strong>Presiona espacio al terminar.</strong><span>Una palabra limpia lanza un golpe especial y aumenta el combo.</span></li>
           <li><strong>Cuida la precisión.</strong><span>Un error abre tu defensa y el rival contraataca.</span></li>
-          <li><strong>Sube tu rango.</strong><span>Encadena palabras para avanzar de D hasta SS.</span></li>
+          <li><strong>Completa cada sección.</strong><span>Las frases avanzan por fila guía, ritmo, precisión y retos de dificultad.</span></li>
         </ol>
         <p class="tip">Consejo: mira la palabra, no tus manos. Las marcas de F y J te ayudan a volver a la posición inicial.</p>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog">
+      <form method="dialog">
+        <div class="dialog-head">
+          <div><p class="eyebrow">CONFIGURACIÓN</p><h2>Ajustes</h2></div>
+          <button class="close-button" value="close" aria-label="Cerrar">×</button>
+        </div>
+        <div class="settings-list">
+          <button type="button" id="settingsSoundButton">Sonido: activado</button>
+          <button type="button" id="settingsFullscreenButton">Abrir pantalla completa</button>
+        </div>
+        <p class="tip">Al cambiar de pestaña o minimizar el navegador, el entrenamiento se pausa automáticamente.</p>
       </form>
     </dialog>
 
