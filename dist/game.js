@@ -10,30 +10,57 @@
       label: 'Nivel 1 · Fundamentos',
       enemyInterval: 9000,
       typoDamage: 4,
-      words: [
-        'casa', 'mesa', 'gato', 'luna', 'juego', 'tecla', 'dedos', 'ritmo', 'espacio', 'camino',
-        'fuerza', 'sonido', 'amigo', 'escudo', 'ataque', 'práctica', 'equipo', 'rápido', 'preciso', 'victoria'
+      sections: [
+        { title: 'Fila guía', sentences: [
+          'La práctica diaria mejora el control de tus manos.',
+          'Coloca tus dedos con calma sobre la fila central.'
+        ] },
+        { title: 'Ritmo constante', sentences: [
+          'Escribe cada palabra sin mirar las teclas.',
+          'Un ritmo estable vale más que correr sin control.'
+        ] },
+        { title: 'Precisión básica', sentences: [
+          'Corrige tus hábitos y aumenta poco a poco tu precisión.',
+          'Respira, mantén la postura y termina la frase completa.'
+        ] }
       ]
     },
     intermedio: {
       label: 'Nivel 2 · Fluidez',
       enemyInterval: 6500,
       typoDamage: 7,
-      words: [
-        'mecánica', 'energía', 'tecnología', 'español', 'conexión', 'velocidad', 'precisión', 'combate',
-        'entrenamiento', 'relámpago', 'secuencia', 'concentración', 'dominio', 'respuesta', 'movimiento',
-        'habilidad', 'constancia', 'memoria', 'coordinación', 'campeón', 'desafío', 'carácter'
+      sections: [
+        { title: 'Acentos y español', sentences: [
+          'La mecánica del teclado exige atención y coordinación.',
+          'Escribir en español también requiere acentos y precisión.'
+        ] },
+        { title: 'Fluidez', sentences: [
+          'La velocidad aparece cuando mantienes una secuencia constante.',
+          'Tu memoria muscular responde mejor con práctica consciente.'
+        ] },
+        { title: 'Concentración', sentences: [
+          'Cada movimiento preciso fortalece tu habilidad frente al desafío.',
+          'Mantén la concentración aunque el rival aumente su velocidad.'
+        ] }
       ]
     },
     experto: {
       label: 'Nivel 3 · Dominio',
       enemyInterval: 4600,
       typoDamage: 10,
-      words: [
-        'extraordinario', 'programación', 'perseverancia', 'electromagnético', 'responsabilidad',
-        'sincronización', 'autodisciplina', 'retroalimentación', 'desarrollador', 'configuración',
-        'interacción', 'optimización', 'determinación', 'competitividad', 'conocimiento',
-        'experimentación', 'aproximación', 'arquitectura', 'comunicación', 'independencia'
+      sections: [
+        { title: 'Lenguaje técnico', sentences: [
+          'La programación eficiente necesita arquitectura, comunicación y responsabilidad.',
+          'Una buena configuración mejora la interacción entre todos los componentes.'
+        ] },
+        { title: 'Dominio', sentences: [
+          'La sincronización extraordinaria nace de la perseverancia y la autodisciplina.',
+          'Optimiza cada movimiento sin sacrificar conocimiento ni determinación.'
+        ] },
+        { title: 'Reto final', sentences: [
+          'La experimentación constante transforma la dificultad en independencia profesional.',
+          'Tu precisión demuestra que puedes dominar cualquier desafío tecnológico.'
+        ] }
       ]
     }
   };
@@ -47,7 +74,7 @@
   const state = {
     mode: 'menu',
     level: 'novato',
-    words: [],
+    lessons: [],
     wordIndex: 0,
     typed: '',
     wave: 0,
@@ -75,18 +102,14 @@
     sceneTime: 0
   };
 
-  function shuffled(list) {
-    const copy = [...list];
-    for (let i = copy.length - 1; i > 0; i -= 1) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [copy[i], copy[j]] = [copy[j], copy[i]];
-    }
-    return copy;
-  }
-
   function currentLevel() { return LEVELS[state.level]; }
   function currentEnemy() { return ENEMIES[state.wave]; }
-  function currentWord() { return state.words[state.wordIndex] || ''; }
+  function currentLesson() { return state.lessons[state.wave]; }
+  function sentenceWords() { return currentLesson()?.words || []; }
+  function currentWord() { return sentenceWords()[state.wordIndex] || ''; }
+  function currentTypingWord() {
+    return currentWord().replace(/[.,;:!?¿¡]+$/u, '').toLocaleLowerCase('es');
+  }
 
   function initAudio() {
     if (!state.sound || state.audio) return;
@@ -116,7 +139,10 @@
   function beginGame() {
     initAudio();
     state.mode = 'playing';
-    state.words = shuffled(currentLevel().words);
+    state.lessons = currentLevel().sections.map((section) => {
+      const text = section.sentences[Math.floor(Math.random() * section.sentences.length)];
+      return { section: section.title, text, words: text.split(' ') };
+    });
     state.wordIndex = 0;
     state.typed = '';
     state.wave = 0;
@@ -130,6 +156,8 @@
     state.floatingText.length = 0;
     state.playerAction = null;
     state.enemyAction = null;
+    document.body.classList.add('game-active');
+    window.scrollTo(0, 0);
     loadEnemy();
     scheduleEnemy();
     $('startPanel').classList.add('hidden');
@@ -137,7 +165,7 @@
     $('resultPanel').classList.add('hidden');
     $('hud').setAttribute('aria-hidden', 'false');
     $('typingInput').disabled = false;
-    $('typingInput').placeholder = 'Escribe la palabra y presiona espacio';
+    $('typingInput').placeholder = 'Escribe…';
     $('typingInput').value = '';
     $('typingInput').focus({ preventScroll: true });
     updateUi();
@@ -159,6 +187,7 @@
     state.pausedAt = performance.now();
     $('pausePanel').classList.remove('hidden');
     $('typingInput').disabled = true;
+    $('pauseGameButton').textContent = 'Continuar';
   }
 
   function resumeGame() {
@@ -171,11 +200,13 @@
     $('pausePanel').classList.add('hidden');
     $('typingInput').disabled = false;
     $('typingInput').focus({ preventScroll: true });
+    $('pauseGameButton').textContent = 'Pausa';
   }
 
   function returnToMenu() {
     state.mode = 'menu';
     state.typed = '';
+    document.body.classList.remove('game-active');
     $('startPanel').classList.remove('hidden');
     $('pausePanel').classList.add('hidden');
     $('resultPanel').classList.add('hidden');
@@ -183,10 +214,17 @@
     $('typingInput').disabled = true;
     $('typingInput').value = '';
     $('lessonLabel').textContent = 'Selecciona un nivel para comenzar';
-    $('typedWord').textContent = '';
-    $('remainingWord').textContent = 'preparado';
-    $('nextWord').textContent = 'para escribir';
+    $('sentenceCount').textContent = 'FRASE 1/3';
+    $('streakLabel').textContent = 'RACHA PERFECTA 0';
+    $('sentenceLine').replaceChildren();
+    const ready = document.createElement('span');
+    ready.className = 'sentence-current';
+    ready.textContent = 'preparado';
+    const prompt = document.createElement('span');
+    prompt.textContent = 'para escribir una frase';
+    $('sentenceLine').append(ready, prompt);
     $('lessonProgress').style.width = '0%';
+    $('pauseGameButton').textContent = 'Pausa';
   }
 
   function elapsedMinutes() {
@@ -232,7 +270,11 @@
 
   function completeWord() {
     const now = performance.now();
-    const damage = Math.min(13 + state.combo * .75, 26);
+    const words = sentenceWords();
+    const sentenceComplete = state.wordIndex === words.length - 1;
+    const damage = sentenceComplete
+      ? state.enemyHp
+      : Math.min((state.enemyMaxHp / words.length) + state.combo * .45, state.enemyHp);
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     state.enemyHp = Math.max(0, state.enemyHp - damage);
@@ -250,9 +292,11 @@
       scheduleEnemy(now);
     }
 
-    state.wordIndex = (state.wordIndex + 1) % state.words.length;
+    if (!sentenceComplete) state.wordIndex += 1;
     state.typed = '';
     $('typingInput').value = '';
+
+    if (sentenceComplete) state.enemyHp = 0;
 
     if (state.enemyHp <= 0) {
       state.enemyAction = { type: 'defeated', started: now, duration: 900 };
@@ -262,6 +306,8 @@
         if (state.wave === ENEMIES.length - 1) finishGame(true);
         else {
           state.wave += 1;
+          state.wordIndex = 0;
+          state.typed = '';
           state.playerHp = Math.min(100, state.playerHp + 15);
           loadEnemy();
           scheduleEnemy();
@@ -326,13 +372,38 @@
     $('bestWpm').textContent = `${localStorage.getItem('desco-keyboard-best') || 0} PPM`;
   }
 
+  function renderSentence() {
+    const line = $('sentenceLine');
+    const words = sentenceWords();
+    line.replaceChildren();
+
+    words.forEach((word, index) => {
+      const span = document.createElement('span');
+      if (index < state.wordIndex) {
+        span.className = 'sentence-done';
+        span.textContent = word;
+      } else if (index === state.wordIndex) {
+        span.className = 'sentence-current';
+        const typed = document.createElement('span');
+        typed.className = 'typed-letter';
+        typed.textContent = word.slice(0, state.typed.length);
+        span.append(typed, document.createTextNode(word.slice(state.typed.length)));
+      } else {
+        span.textContent = word;
+      }
+      line.append(span);
+    });
+  }
+
   function updateUi() {
-    const word = currentWord();
-    $('typedWord').textContent = state.typed;
-    $('remainingWord').textContent = word.slice(state.typed.length) || ' '; 
-    $('nextWord').textContent = state.words[(state.wordIndex + 1) % state.words.length] || '';
-    $('lessonLabel').textContent = currentLevel().label;
-    $('lessonProgress').style.width = `${(state.typed.length / Math.max(word.length, 1)) * 100}%`;
+    const word = currentTypingWord();
+    const words = sentenceWords();
+    renderSentence();
+    $('sentenceCount').textContent = `FRASE ${state.wave + 1}/${state.lessons.length}`;
+    $('lessonLabel').textContent = `${currentLevel().label} · ${currentLesson().section}`;
+    $('streakLabel').textContent = `RACHA PERFECTA ${state.combo}`;
+    const phraseProgress = (state.wordIndex + (state.typed.length / Math.max(word.length, 1))) / Math.max(words.length, 1);
+    $('lessonProgress').style.width = `${phraseProgress * 100}%`;
     $('playerHealth').style.width = `${state.playerHp}%`;
     $('enemyHealth').style.width = `${(state.enemyHp / state.enemyMaxHp) * 100}%`;
     $('playerHpText').textContent = Math.ceil(state.playerHp);
@@ -346,10 +417,11 @@
   function handleInput(event) {
     if (state.mode !== 'playing') return;
     const input = event.target.value;
-    const target = currentWord();
+    const target = currentTypingWord();
+    const comparableInput = input.toLocaleLowerCase('es');
 
     if (input.endsWith(' ')) {
-      if (input.trim() === target && state.typed === target) completeWord();
+      if (input.trim().toLocaleLowerCase('es') === target && state.typed === target) completeWord();
       else {
         typo();
         event.target.value = state.typed;
@@ -357,10 +429,10 @@
       return;
     }
 
-    if (target.startsWith(input)) {
-      const added = Math.max(0, input.length - state.typed.length);
+    if (target.startsWith(comparableInput)) {
+      const added = Math.max(0, comparableInput.length - state.typed.length);
       state.correctKeys += added;
-      state.typed = input;
+      state.typed = comparableInput;
       if (added) lightAttack();
       updateUi();
     } else {
@@ -565,8 +637,8 @@
     ctx.save();
     if (state.shake > .2) ctx.translate((Math.random() - .5) * state.shake, (Math.random() - .5) * state.shake);
     drawBackground(now);
-    drawStickman(425, 595, 1.18, '#5ee7f5', 1, state.playerAction, now, false);
-    drawStickman(855, 595, 1.18, currentEnemy().color, -1, state.enemyAction, now, true);
+    drawStickman(425, 535, 1.08, '#5ee7f5', 1, state.playerAction, now, false);
+    drawStickman(855, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
     drawWarning(now);
     drawEffects();
     if (state.flash > .01) {
@@ -591,24 +663,47 @@
   $('menuButton').addEventListener('click', returnToMenu);
   $('resumeButton').addEventListener('click', resumeGame);
   $('exitButton').addEventListener('click', returnToMenu);
+  $('homeGameButton').addEventListener('click', returnToMenu);
+  $('pauseGameButton').addEventListener('click', () => {
+    if (state.mode === 'playing') pauseGame();
+    else if (state.mode === 'paused') resumeGame();
+  });
   $('typingInput').addEventListener('input', handleInput);
   $('typingInput').addEventListener('paste', (event) => event.preventDefault());
   $('arenaWrap').addEventListener('click', () => {
     if (state.mode === 'playing') $('typingInput').focus({ preventScroll: true });
   });
 
-  $('helpButton').addEventListener('click', () => $('helpDialog').showModal());
-  $('soundButton').addEventListener('click', () => {
-    state.sound = !state.sound;
-    localStorage.setItem('desco-keyboard-sound', state.sound ? 'on' : 'off');
+  function updateSoundLabels() {
     $('soundButton').textContent = `Sonido: ${state.sound ? 'sí' : 'no'}`;
     $('soundButton').setAttribute('aria-pressed', String(state.sound));
+    $('settingsSoundButton').textContent = `Sonido: ${state.sound ? 'activado' : 'desactivado'}`;
+  }
+
+  function toggleSound() {
+    state.sound = !state.sound;
+    localStorage.setItem('desco-keyboard-sound', state.sound ? 'on' : 'off');
+    updateSoundLabels();
     if (state.sound) tone(320, .07, 'triangle', .035);
-  });
-  $('fullscreenButton').addEventListener('click', async () => {
+  }
+
+  async function toggleFullscreen() {
     if (!document.fullscreenElement) await $('arenaWrap').requestFullscreen?.();
     else await document.exitFullscreen?.();
-  });
+  }
+
+  function openGameDialog(dialog) {
+    if (state.mode === 'playing') pauseGame();
+    dialog.showModal();
+  }
+
+  $('helpButton').addEventListener('click', () => $('helpDialog').showModal());
+  $('helpGameButton').addEventListener('click', () => openGameDialog($('helpDialog')));
+  $('settingsGameButton').addEventListener('click', () => openGameDialog($('settingsDialog')));
+  $('soundButton').addEventListener('click', toggleSound);
+  $('settingsSoundButton').addEventListener('click', toggleSound);
+  $('fullscreenButton').addEventListener('click', toggleFullscreen);
+  $('settingsFullscreenButton').addEventListener('click', toggleFullscreen);
 
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.mode === 'playing') {
@@ -623,8 +718,7 @@
     if (document.hidden && state.mode === 'playing') pauseGame();
   });
 
-  $('soundButton').textContent = `Sonido: ${state.sound ? 'sí' : 'no'}`;
-  $('soundButton').setAttribute('aria-pressed', String(state.sound));
+  updateSoundLabels();
   updateBest();
   requestAnimationFrame(render);
 })();
