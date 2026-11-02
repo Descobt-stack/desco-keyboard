@@ -5,70 +5,15 @@
   const canvas = $('arena');
   const ctx = canvas.getContext('2d');
 
-  const LEVELS = {
-    novato: {
-      label: 'Nivel 1 · Fundamentos',
-      enemyInterval: 9000,
-      typoDamage: 4,
-      sections: [
-        { title: 'Fila guía', sentences: [
-          'La práctica diaria mejora el control de tus manos.',
-          'Coloca tus dedos con calma sobre la fila central.'
-        ] },
-        { title: 'Ritmo constante', sentences: [
-          'Escribe cada palabra sin mirar las teclas.',
-          'Un ritmo estable vale más que correr sin control.'
-        ] },
-        { title: 'Precisión básica', sentences: [
-          'Corrige tus hábitos y aumenta poco a poco tu precisión.',
-          'Respira, mantén la postura y termina la frase completa.'
-        ] }
-      ]
-    },
-    intermedio: {
-      label: 'Nivel 2 · Fluidez',
-      enemyInterval: 6500,
-      typoDamage: 7,
-      sections: [
-        { title: 'Acentos y español', sentences: [
-          'La mecánica del teclado exige atención y coordinación.',
-          'Escribir en español también requiere acentos y precisión.'
-        ] },
-        { title: 'Fluidez', sentences: [
-          'La velocidad aparece cuando mantienes una secuencia constante.',
-          'Tu memoria muscular responde mejor con práctica consciente.'
-        ] },
-        { title: 'Concentración', sentences: [
-          'Cada movimiento preciso fortalece tu habilidad frente al desafío.',
-          'Mantén la concentración aunque el rival aumente su velocidad.'
-        ] }
-      ]
-    },
-    experto: {
-      label: 'Nivel 3 · Dominio',
-      enemyInterval: 4600,
-      typoDamage: 10,
-      sections: [
-        { title: 'Lenguaje técnico', sentences: [
-          'La programación eficiente necesita arquitectura, comunicación y responsabilidad.',
-          'Una buena configuración mejora la interacción entre todos los componentes.'
-        ] },
-        { title: 'Dominio', sentences: [
-          'La sincronización extraordinaria nace de la perseverancia y la autodisciplina.',
-          'Optimiza cada movimiento sin sacrificar conocimiento ni determinación.'
-        ] },
-        { title: 'Reto final', sentences: [
-          'La experimentación constante transforma la dificultad en independencia profesional.',
-          'Tu precisión demuestra que puedes dominar cualquier desafío tecnológico.'
-        ] }
-      ]
-    }
-  };
+  const LEVELS = window.DESCO_PHRASE_LEVELS;
+  if (!LEVELS) throw new Error('No se pudo cargar el banco de frases.');
 
   const ENEMIES = [
-    { name: 'SOMBRA', color: '#ff4f91', hp: 74, speed: 1 },
-    { name: 'VÓRTICE', color: '#8c6cff', hp: 96, speed: 1.08 },
-    { name: 'NÉMESIS', color: '#ff7358', hp: 122, speed: 1.18 }
+    { name: 'CARMESÍ', color: '#ef3340', hp: 72 },
+    { name: 'BRASA', color: '#ff7a28', hp: 82 },
+    { name: 'ÁMBAR', color: '#f4b942', hp: 92 },
+    { name: 'MAGENTA', color: '#dc3f8f', hp: 104 },
+    { name: 'VÓRTICE', color: '#7a4de8', hp: 116 }
   ];
 
   const state = {
@@ -87,11 +32,11 @@
     wrongKeys: 0,
     startAt: 0,
     lastFrame: 0,
-    nextEnemyAttack: 0,
-    enemyWarning: false,
-    enemyStrikeAt: 0,
+    wordDeadline: 0,
+    roundStartedAt: 0,
     pausedAt: 0,
     sound: localStorage.getItem('desco-keyboard-sound') !== 'off',
+    theme: localStorage.getItem('desco-keyboard-theme') === 'light' ? 'light' : 'dark',
     shake: 0,
     flash: 0,
     playerAction: null,
@@ -108,7 +53,10 @@
   function sentenceWords() { return currentLesson()?.words || []; }
   function currentWord() { return sentenceWords()[state.wordIndex] || ''; }
   function currentTypingWord() {
-    return currentWord().replace(/[.,;:!?¿¡]+$/u, '').toLocaleLowerCase('es');
+    const word = state.level === 'novato'
+      ? currentWord().replace(/[.,;:!?¿¡"()]/gu, '')
+      : currentWord();
+    return word.toLocaleLowerCase('es');
   }
 
   function initAudio() {
@@ -131,16 +79,24 @@
     osc.stop(state.audio.currentTime + duration);
   }
 
-  function scheduleEnemy(now = performance.now()) {
-    state.enemyWarning = false;
-    state.nextEnemyAttack = now + currentLevel().enemyInterval / currentEnemy().speed;
+  function selectPhrase(section, sectionIndex) {
+    const storageKey = `desco-keyboard-last-${state.level}-${sectionIndex}`;
+    const previous = localStorage.getItem(storageKey);
+    const available = section.phrases.filter((phrase) => phrase !== previous);
+    const text = available[Math.floor(Math.random() * available.length)] || section.phrases[0];
+    localStorage.setItem(storageKey, text);
+    return text;
+  }
+
+  function resetWordDeadline(now = performance.now()) {
+    state.wordDeadline = now + currentLevel().secondsPerWord * 1000;
   }
 
   function beginGame() {
     initAudio();
     state.mode = 'playing';
-    state.lessons = currentLevel().sections.map((section) => {
-      const text = section.sentences[Math.floor(Math.random() * section.sentences.length)];
+    state.lessons = currentLevel().sections.map((section, sectionIndex) => {
+      const text = selectPhrase(section, sectionIndex);
       return { section: section.title, text, words: text.split(' ') };
     });
     state.wordIndex = 0;
@@ -152,6 +108,7 @@
     state.correctKeys = 0;
     state.wrongKeys = 0;
     state.startAt = performance.now();
+    state.roundStartedAt = state.startAt;
     state.particles.length = 0;
     state.floatingText.length = 0;
     state.playerAction = null;
@@ -159,7 +116,7 @@
     document.body.classList.add('game-active');
     window.scrollTo(0, 0);
     loadEnemy();
-    scheduleEnemy();
+    resetWordDeadline();
     $('startPanel').classList.add('hidden');
     $('pausePanel').classList.add('hidden');
     $('resultPanel').classList.add('hidden');
@@ -178,7 +135,8 @@
     state.enemyHp = enemy.hp;
     state.enemyAction = { type: 'spawn', started: performance.now(), duration: 620 };
     $('enemyName').textContent = enemy.name;
-    $('waveText').textContent = `OLEADA ${state.wave + 1}/3`;
+    state.roundStartedAt = performance.now();
+    $('waveText').textContent = `OLEADA ${state.wave + 1}/${ENEMIES.length}`;
   }
 
   function pauseGame() {
@@ -194,8 +152,8 @@
     if (state.mode !== 'paused') return;
     const pausedFor = performance.now() - state.pausedAt;
     state.startAt += pausedFor;
-    state.nextEnemyAttack += pausedFor;
-    if (state.enemyWarning) state.enemyStrikeAt += pausedFor;
+    state.wordDeadline += pausedFor;
+    state.roundStartedAt += pausedFor;
     state.mode = 'playing';
     $('pausePanel').classList.add('hidden');
     $('typingInput').disabled = false;
@@ -214,7 +172,7 @@
     $('typingInput').disabled = true;
     $('typingInput').value = '';
     $('lessonLabel').textContent = 'Selecciona un nivel para comenzar';
-    $('sentenceCount').textContent = 'FRASE 1/3';
+    $('sentenceCount').textContent = 'RONDA 1/5';
     $('streakLabel').textContent = 'RACHA PERFECTA 0';
     $('sentenceLine').replaceChildren();
     const ready = document.createElement('span');
@@ -264,7 +222,7 @@
 
   function lightAttack() {
     state.playerAction = { type: 'jab', started: performance.now(), duration: 180 };
-    createImpact(836, 403, '#5ee7f5', 4);
+    createImpact(840, 403, '#f7f7f2', 4);
     tone(190 + (state.correctKeys % 5) * 18, .025, 'square', .012);
   }
 
@@ -282,17 +240,14 @@
     state.enemyAction = { type: 'hit', started: now, duration: 390 };
     state.shake = state.combo % 4 === 0 ? 12 : 7;
     state.flash = .32;
-    createImpact(850, 398, state.combo % 4 === 0 ? '#ffd35a' : '#5ee7f5', 18);
+    createImpact(850, 398, state.combo % 4 === 0 ? '#ffd35a' : '#f7f7f2', 18);
     addFloat(`+${Math.round(damage)}`, 840, 350, '#ffd35a');
     tone(state.combo % 4 === 0 ? 95 : 130, .09, 'sawtooth', .06);
 
-    if (state.enemyWarning) {
-      state.enemyWarning = false;
-      addFloat('BLOQUEO', 640, 295, '#5ee7f5');
-      scheduleEnemy(now);
+    if (!sentenceComplete) {
+      state.wordIndex += 1;
+      resetWordDeadline(now);
     }
-
-    if (!sentenceComplete) state.wordIndex += 1;
     state.typed = '';
     $('typingInput').value = '';
 
@@ -310,7 +265,7 @@
           state.typed = '';
           state.playerHp = Math.min(100, state.playerHp + 15);
           loadEnemy();
-          scheduleEnemy();
+          resetWordDeadline();
           updateUi();
         }
       }, 900);
@@ -332,14 +287,14 @@
     void $('typingInput').offsetWidth;
     $('typingInput').closest('.input-shell').classList.add('error');
     tone(72, .14, 'sawtooth', .055);
+    resetWordDeadline();
     if (state.playerHp <= 0) finishGame(false);
     updateUi();
   }
 
-  function enemyAttack() {
+  function enemyAttack(reason = 'timeout') {
     if (state.mode !== 'playing') return;
-    const damage = Math.max(currentLevel().typoDamage, 6);
-    state.enemyWarning = false;
+    const damage = reason === 'timeout' ? currentLevel().timeoutDamage : currentLevel().typoDamage;
     state.playerHp = Math.max(0, state.playerHp - damage);
     state.combo = 0;
     state.enemyAction = { type: 'attack', started: performance.now(), duration: 460 };
@@ -348,7 +303,6 @@
     createImpact(435, 405, currentEnemy().color, 15);
     addFloat(`-${damage}`, 440, 350, '#ff5368');
     tone(65, .16, 'square', .06);
-    scheduleEnemy();
     if (state.playerHp <= 0) finishGame(false);
     updateUi();
   }
@@ -399,7 +353,7 @@
     const word = currentTypingWord();
     const words = sentenceWords();
     renderSentence();
-    $('sentenceCount').textContent = `FRASE ${state.wave + 1}/${state.lessons.length}`;
+    $('sentenceCount').textContent = `RONDA ${state.wave + 1}/${state.lessons.length}`;
     $('lessonLabel').textContent = `${currentLevel().label} · ${currentLesson().section}`;
     $('streakLabel').textContent = `RACHA PERFECTA ${state.combo}`;
     const phraseProgress = (state.wordIndex + (state.typed.length / Math.max(word.length, 1))) / Math.max(words.length, 1);
@@ -504,6 +458,8 @@
     let punch = 0;
     let kick = 0;
     let hit = 0;
+    const idleGuard = Math.sin(state.sceneTime * .006 + (isEnemy ? 1.8 : 0));
+    const idleStep = Math.sin(state.sceneTime * .0032 + (isEnemy ? .8 : 0));
 
     if (type === 'jab' || type === 'heavy' || type === 'attack' || type === 'counter') {
       const power = type === 'jab' ? 28 : 68;
@@ -548,10 +504,10 @@
     const hip = { x: 0, y: -92 };
     const chest = { x: 2, y: -165 };
     const head = { x: 2, y: -210 };
-    const frontFoot = { x: 42 + kick * .72, y: -4 - kick * .34 };
-    const backFoot = { x: -42, y: -4 };
-    const frontHand = { x: 45 + punch, y: -151 - punch * .08 };
-    const backHand = { x: -35, y: -132 };
+    const frontFoot = { x: 42 + kick * .72 + idleStep * 3, y: -4 - kick * .34 };
+    const backFoot = { x: -42 - idleStep * 3, y: -4 };
+    const frontHand = { x: 45 + punch + idleGuard * 4, y: -151 - punch * .08 + idleGuard * 5 };
+    const backHand = { x: -35 - idleGuard * 3, y: -132 - idleGuard * 6 };
 
     ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(-18, -48); ctx.lineTo(backFoot.x, backFoot.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(24 + kick * .25, -48 - kick * .18); ctx.lineTo(frontFoot.x, frontFoot.y); ctx.stroke();
@@ -564,19 +520,6 @@
     ctx.fillStyle = color;
     ctx.shadowBlur = 10;
     ctx.beginPath(); ctx.arc(11, -214, 4, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
-  }
-
-  function drawWarning(now) {
-    if (!state.enemyWarning || state.mode !== 'playing') return;
-    const pulse = .65 + Math.sin(now * .018) * .3;
-    ctx.save();
-    ctx.textAlign = 'center';
-    ctx.font = '900 28px ui-monospace, monospace';
-    ctx.fillStyle = `rgba(255,83,104,${pulse})`;
-    ctx.shadowBlur = 22;
-    ctx.shadowColor = '#ff5368';
-    ctx.fillText('⚠ TERMINA LA PALABRA PARA BLOQUEAR', 640, 235);
     ctx.restore();
   }
 
@@ -613,13 +556,10 @@
 
   function updateCombat(now) {
     if (state.mode !== 'playing') return;
-    if (!state.enemyWarning && now >= state.nextEnemyAttack && state.enemyHp > 0) {
-      state.enemyWarning = true;
-      state.enemyStrikeAt = now + 1500;
-      tone(320, .08, 'square', .025);
-      setTimeout(() => tone(420, .08, 'square', .025), 240);
+    if (now >= state.wordDeadline && state.enemyHp > 0) {
+      enemyAttack('timeout');
+      resetWordDeadline(now);
     }
-    if (state.enemyWarning && now >= state.enemyStrikeAt) enemyAttack();
     if (state.playerAction && actionProgress(state.playerAction, now) >= 1) state.playerAction = null;
     if (state.enemyAction && actionProgress(state.enemyAction, now) >= 1 && state.enemyAction.type !== 'defeated') state.enemyAction = null;
     if (Math.floor(now / 250) !== Math.floor((now - 16) / 250)) updateUi();
@@ -637,9 +577,10 @@
     ctx.save();
     if (state.shake > .2) ctx.translate((Math.random() - .5) * state.shake, (Math.random() - .5) * state.shake);
     drawBackground(now);
-    drawStickman(425, 535, 1.08, '#5ee7f5', 1, state.playerAction, now, false);
-    drawStickman(855, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
-    drawWarning(now);
+    const playerX = 405 + Math.sin(now * .0007) * 24;
+    const enemyX = 875 + Math.sin(now * .00062 + Math.PI) * 30;
+    drawStickman(playerX, 535, 1.08, '#f7f7f2', 1, state.playerAction, now, false);
+    drawStickman(enemyX, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
     drawEffects();
     if (state.flash > .01) {
       ctx.fillStyle = `rgba(255,255,255,${state.flash * .2})`;
@@ -687,6 +628,19 @@
     if (state.sound) tone(320, .07, 'triangle', .035);
   }
 
+  function applyTheme() {
+    const isLight = state.theme === 'light';
+    document.body.classList.toggle('light-theme', isLight);
+    $('themeToggleButton').textContent = `Tema: ${isLight ? 'claro' : 'oscuro'}`;
+    $('themeToggleButton').setAttribute('aria-pressed', String(isLight));
+  }
+
+  function toggleTheme() {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('desco-keyboard-theme', state.theme);
+    applyTheme();
+  }
+
   async function toggleFullscreen() {
     if (!document.fullscreenElement) await $('arenaWrap').requestFullscreen?.();
     else await document.exitFullscreen?.();
@@ -702,6 +656,7 @@
   $('settingsGameButton').addEventListener('click', () => openGameDialog($('settingsDialog')));
   $('soundButton').addEventListener('click', toggleSound);
   $('settingsSoundButton').addEventListener('click', toggleSound);
+  $('themeToggleButton').addEventListener('click', toggleTheme);
   $('fullscreenButton').addEventListener('click', toggleFullscreen);
   $('settingsFullscreenButton').addEventListener('click', toggleFullscreen);
 
@@ -719,6 +674,7 @@
   });
 
   updateSoundLabels();
+  applyTheme();
   updateBest();
   requestAnimationFrame(render);
 })();

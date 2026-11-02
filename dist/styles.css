@@ -29,6 +29,39 @@ body {
     var(--bg);
 }
 
+body.light-theme {
+  color-scheme: light;
+  --bg: #edf2f8;
+  --surface: #ffffff;
+  --surface-2: #e5edf6;
+  --line: rgba(18, 35, 58, .14);
+  --text: #172033;
+  --muted: #607087;
+  background:
+    radial-gradient(circle at 18% 0%, rgba(120, 87, 230, .12), transparent 32rem),
+    radial-gradient(circle at 90% 20%, rgba(0, 158, 181, .09), transparent 28rem),
+    var(--bg);
+}
+
+.light-theme .topbar { background: rgba(255, 255, 255, .72); }
+.light-theme .brand-mark { background: linear-gradient(135deg, rgba(0,158,181,.12), rgba(120,87,230,.14)); }
+.light-theme .game-heading,
+.light-theme .feature-strip,
+.light-theme footer { color: var(--text); }
+.light-theme dialog { color: #172033; background: #ffffff; }
+.light-theme .settings-list button { background: #f1f5fa; }
+.light-theme .tip { background: rgba(172, 126, 0, .08); }
+
+/* La arena conserva contraste alto en ambos temas para distinguir a los luchadores. */
+.light-theme .start-panel,
+.light-theme .pause-panel,
+.light-theme .result-panel { color: #f7f8ff; }
+.light-theme .start-panel .eyebrow,
+.light-theme .pause-panel .eyebrow,
+.light-theme .result-panel .eyebrow { color: var(--cyan); }
+.light-theme .difficulty { color: #f7f8ff; }
+.light-theme .pause-panel > p:not(.eyebrow) { color: #aeb7cc; }
+
 body.game-active { overflow: hidden; }
 
 button, input { font: inherit; }

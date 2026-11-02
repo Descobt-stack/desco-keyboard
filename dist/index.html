@@ -49,7 +49,7 @@
               <button type="button" id="settingsGameButton">Ajustes</button>
               <button type="button" id="helpGameButton">Cómo jugar</button>
             </div>
-            <span>ENTRENAMIENTO POR SECCIONES</span>
+            <span>CAMPAÑA DE 5 SECCIONES</span>
           </div>
 
           <canvas id="arena" width="1280" height="720" aria-label="Arena de combate stickman"></canvas>
@@ -60,7 +60,7 @@
               <div class="health-track"><span id="playerHealth"></span></div>
             </div>
             <div class="round-badge">
-              <span id="waveText">OLEADA 1/3</span>
+              <span id="waveText">OLEADA 1/5</span>
               <strong id="comboText">x0</strong>
             </div>
             <div class="fighter-hud enemy-hud">
@@ -76,13 +76,13 @@
 
             <div class="difficulty-grid" role="group" aria-label="Selecciona la dificultad">
               <button class="difficulty active" type="button" data-level="novato">
-                <span>01</span><strong>Novato</strong><small>Frases cortas · sin prisa</small>
+                <span>01</span><strong>Principiante</strong><small>5 s por palabra · sin puntuación</small>
               </button>
               <button class="difficulty" type="button" data-level="intermedio">
-                <span>02</span><strong>Intermedio</strong><small>Acentos y frases · ritmo medio</small>
+                <span>02</span><strong>Intermedio</strong><small>3.5 s por palabra · puntuación</small>
               </button>
               <button class="difficulty" type="button" data-level="experto">
-                <span>03</span><strong>Experto</strong><small>Precisión alta · rivales rápidos</small>
+                <span>03</span><strong>Experto</strong><small>2.4 s por palabra · máxima precisión</small>
               </button>
             </div>
 
@@ -119,7 +119,7 @@
 
             <div class="word-zone" id="wordZone">
               <div class="sentence-meta">
-                <span id="sentenceCount">FRASE 1/3</span>
+              <span id="sentenceCount">RONDA 1/5</span>
                 <span id="lessonLabel">Selecciona un nivel para comenzar</span>
                 <span id="streakLabel">RACHA PERFECTA 0</span>
               </div>
@@ -169,8 +169,8 @@
         <ol>
           <li><strong>Escribe la palabra iluminada.</strong><span>Cada letra correcta activa un ataque ligero.</span></li>
           <li><strong>Presiona espacio al terminar.</strong><span>Una palabra limpia lanza un golpe especial y aumenta el combo.</span></li>
-          <li><strong>Cuida la precisión.</strong><span>Un error abre tu defensa y el rival contraataca.</span></li>
-          <li><strong>Completa cada sección.</strong><span>Las frases avanzan por fila guía, ritmo, precisión y retos de dificultad.</span></li>
+          <li><strong>Cuida la precisión.</strong><span>El rival solo ataca si cometes un error o tardas demasiado en una palabra.</span></li>
+          <li><strong>Supera las cinco secciones.</strong><span>Cada partida elige frases diferentes de un banco de 50 por nivel.</span></li>
         </ol>
         <p class="tip">Consejo: mira la palabra, no tus manos. Las marcas de F y J te ayudan a volver a la posición inicial.</p>
       </form>
@@ -184,12 +184,14 @@
         </div>
         <div class="settings-list">
           <button type="button" id="settingsSoundButton">Sonido: activado</button>
+          <button type="button" id="themeToggleButton">Tema: oscuro</button>
           <button type="button" id="settingsFullscreenButton">Abrir pantalla completa</button>
         </div>
         <p class="tip">Al cambiar de pestaña o minimizar el navegador, el entrenamiento se pausa automáticamente.</p>
       </form>
     </dialog>
 
+    <script src="phrases.js"></script>
     <script src="game.js"></script>
   </body>
 </html>
