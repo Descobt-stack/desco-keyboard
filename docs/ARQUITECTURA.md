@@ -7,19 +7,20 @@ Desco Keyboard convierte una sesión de mecanografía en un combate visual. La a
 ## Flujo del juego
 
 1. El jugador selecciona `Novato`, `Intermedio` o `Experto`.
-2. `beginGame()` reinicia las estadísticas y mezcla el banco de palabras con `shuffled()`.
+2. `beginGame()` reinicia las estadísticas y selecciona una frase para cada sección del nivel.
 3. El evento `input` llama a `handleInput()` después de cada pulsación.
 4. Si el texto sigue siendo un prefijo válido de la palabra objetivo, la letra cuenta como correcta y `lightAttack()` activa un golpe rápido.
-5. Al escribir la palabra completa y presionar espacio, `completeWord()` calcula daño, combo, rango y cambio de rival.
+5. Al escribir la palabra completa y presionar espacio, `completeWord()` calcula daño, combo y avance dentro de la frase.
 6. Si la entrada no coincide con la palabra, `typo()` resta salud, reinicia el combo y activa el contraataque.
-7. `requestAnimationFrame(render)` mantiene el dibujo y las animaciones sincronizados con la pantalla.
+7. Al terminar una frase se completa la sección, cae el rival y comienza la siguiente oleada.
+8. `requestAnimationFrame(render)` mantiene el dibujo y las animaciones sincronizados con la pantalla.
 
 ## Estado central
 
 El objeto `state` contiene toda la sesión activa:
 
 - modo actual (`menu`, `playing`, `paused`, `won`, `lost`);
-- dificultad y cola de palabras;
+- dificultad, secciones, frases y palabra activa;
 - salud del jugador y del rival;
 - combo, mejor combo, teclas correctas y errores;
 - tiempos de inicio y del próximo ataque rival;
@@ -45,7 +46,13 @@ Cada dificultad define:
 - daño recibido por error;
 - intervalo de ataque del enemigo.
 
-Los enemigos tienen diferente salud y velocidad. Antes de atacar aparece un aviso. Si el jugador termina una palabra durante esa ventana, bloquea el golpe. De esta forma la velocidad ayuda, pero la precisión sigue siendo la prioridad.
+Los enemigos tienen diferente salud y velocidad. Cada rival corresponde a una sección y recibe daño conforme se completa su frase. Antes de atacar aparece un aviso. Si el jugador termina una palabra durante esa ventana, bloquea el golpe. De esta forma la velocidad ayuda, pero la precisión sigue siendo la prioridad.
+
+## Ajuste de pantalla y pausa
+
+Durante el combate, la clase `game-active` convierte la arena en una superficie de `100dvh`. Los encabezados y bloques informativos externos se ocultan temporalmente, mientras el HUD, la frase y los controles permanecen dentro del mismo alto visible. Esto evita tener que reducir el zoom en pantallas de laptop.
+
+Los botones de la arena permiten volver al inicio, pausar, abrir ajustes y consultar la ayuda. El evento `visibilitychange` llama a `pauseGame()` cuando el usuario cambia de pestaña o minimiza el navegador.
 
 ## Animación Canvas
 
