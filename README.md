@@ -5,10 +5,13 @@ Juego web de mecanografía en español con combates stickman. Cada letra correct
 ## Funciones de la versión 1.0
 
 - Tres dificultades: Novato, Intermedio y Experto.
-- Vocabulario en español con `ñ` y acentos.
+- Frases en español organizadas por secciones, con `ñ` y acentos.
 - Animación procedural en HTML5 Canvas a 60 FPS.
 - PPM, precisión, combo, rango y barras de salud en tiempo real.
 - Tres rivales por entrenamiento y ataques con ventana de bloqueo.
+- Arena adaptable al alto visible de una laptop sin modificar el zoom.
+- Botones de Inicio, Pausa, Ajustes y Ayuda dentro del juego.
+- Pausa automática al cambiar de pestaña o minimizar el navegador.
 - Sonido generado con Web Audio, sin archivos externos.
 - Mejor marca guardada localmente en el navegador.
 - Diseño adaptable para computadora, tableta y teléfono.
@@ -28,12 +31,13 @@ Para probarlo localmente, abre `dist/index.html` o sirve la carpeta con cualquie
 ## Mecánica principal
 
 1. El jugador elige una dificultad.
-2. El motor mezcla el banco de palabras del nivel.
-3. Cada pulsación se compara con la posición actual de la palabra.
+2. El motor selecciona una frase para cada sección del nivel.
+3. Cada pulsación se compara con la palabra activa dentro de la frase.
 4. Una letra correcta aumenta el conteo para PPM y activa un golpe ligero.
 5. `Espacio` confirma una palabra completa, aplica daño fuerte y suma combo.
 6. Un error reinicia el combo y resta salud.
-7. Los rivales anuncian sus ataques; completar una palabra durante el aviso bloquea el golpe.
+7. Completar la frase vence al rival y abre la siguiente sección.
+8. Los rivales anuncian sus ataques; completar una palabra durante el aviso bloquea el golpe.
 
 ## Autor
 
