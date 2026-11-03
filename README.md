@@ -8,6 +8,7 @@ Juego web de mecanografía en español con combates stickman. Cada letra correct
 - 150 frases revisadas en español: 50 diferentes por dificultad y cinco secciones por partida.
 - El nivel Principiante no exige signos; Intermedio y Experto sí practican acentos y puntuación.
 - Animación procedural en HTML5 Canvas a 60 FPS con stickman clásicos, contornos sólidos y colores mate.
+- Escenario precalculado, partículas reutilizables y bucle limitado a 60 FPS para reducir consumo de CPU y pausas por recolección de memoria.
 - PPM, precisión, combo, rango y barras de salud en tiempo real.
 - Cinco rivales por entrenamiento, con colores, salud y secciones diferentes.
 - Tiempo oculto por palabra: 5 s en Principiante, 3.5 s en Intermedio y 2.4 s en Experto.
@@ -32,6 +33,21 @@ El proyecto no depende de frameworks ni de paquetes externos:
 - `dist/game.js`: motor del juego, animación Canvas, mecanografía, estadísticas y audio.
 
 La explicación técnica completa está en [`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
+
+## Optimización aplicada
+
+La versión actual conserva JavaScript y Canvas nativos. Se estudiaron patrones públicos de
+[`canvas-arcade`](https://github.com/FabianoArthur/canvas-arcade),
+[`Salvo`](https://github.com/Qinging-wu/Salvo),
+[`Minesweeper`](https://github.com/YaelRoman/Minesweeper) y la
+[guía de optimización de Canvas de MDN](https://github.com/mdn/content/blob/main/files/en-us/web/api/canvas_api/tutorial/optimizing_canvas/index.md).
+
+- El escenario estático se dibuja una vez en un canvas auxiliar y después se copia en una sola operación.
+- Las partículas y los textos de daño usan grupos de objetos reutilizables con límites fijos.
+- Los efectos avanzan con pasos estables de 60 Hz y el renderizado no supera ese objetivo en pantallas de alta frecuencia.
+- La pestaña oculta deja de dibujar la arena y el HUD cronometrado ya no reconstruye toda la frase.
+
+La implementación es propia y adapta las ideas generales al motor de Desco Keyboard; no copia código de esos proyectos.
 
 Para probarlo localmente, abre `dist/index.html` o sirve la carpeta con cualquier servidor HTTP estático.
 

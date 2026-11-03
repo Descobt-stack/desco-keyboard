@@ -69,7 +69,7 @@ Los personajes no son imágenes. `drawStickman()` construye cada figura con lín
 - `spawn`: entrada del rival;
 - `defeated`: caída del rival.
 
-Las partículas, el destello y el movimiento de cámara se calculan en cada cuadro y se eliminan cuando termina su vida útil.
+El escenario estático se precalcula en un canvas auxiliar. En cada cuadro solo se copia esa capa y se dibujan el polvo, los personajes y los efectos activos. Las partículas y los textos flotantes usan grupos de objetos reutilizables para evitar crear y destruir objetos durante cada golpe. Los efectos avanzan en pasos de 60 Hz, el renderizado se limita a ese objetivo y se omite cuando la pestaña está oculta.
 
 ## Audio y almacenamiento
 

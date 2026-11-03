@@ -6,6 +6,20 @@
   const ctx = canvas.getContext('2d');
   const PLAYER_X = 405;
   const ENEMY_X = 875;
+  const TARGET_FRAME_MS = 1000 / 60;
+  const MAX_FRAME_DELTA = 40;
+  const MAX_PARTICLES = 96;
+  const MAX_FLOATING_TEXT = 12;
+  const backgroundCanvas = document.createElement('canvas');
+  backgroundCanvas.width = canvas.width;
+  backgroundCanvas.height = canvas.height;
+
+  const particlePool = Array.from({ length: MAX_PARTICLES }, () => ({
+    active: false, x: 0, y: 0, vx: 0, vy: 0, life: 0, decay: 0, size: 0, color: '#fff'
+  }));
+  const floatingTextPool = Array.from({ length: MAX_FLOATING_TEXT }, () => ({
+    active: false, text: '', x: 0, y: 0, color: '#fff', life: 0
+  }));
 
   const LEVELS = window.DESCO_PHRASE_LEVELS;
   if (!LEVELS) throw new Error('No se pudo cargar el banco de frases.');
@@ -37,14 +51,21 @@
     wordDeadline: 0,
     roundStartedAt: 0,
     pausedAt: 0,
+    lastRender: 0,
+    nextRenderAt: 0,
+    lastHudUpdate: 0,
+    effectAccumulator: 0,
+    pendingWaveAdvanceAt: 0,
     sound: localStorage.getItem('desco-keyboard-sound') !== 'off',
     theme: localStorage.getItem('desco-keyboard-theme') === 'light' ? 'light' : 'dark',
     shake: 0,
     flash: 0,
     playerAction: null,
     enemyAction: null,
-    particles: [],
-    floatingText: [],
+    particles: particlePool,
+    floatingText: floatingTextPool,
+    particleCursor: 0,
+    floatingTextCursor: 0,
     audio: null,
     sceneTime: 0
   };
@@ -111,10 +132,14 @@
     state.wrongKeys = 0;
     state.startAt = performance.now();
     state.roundStartedAt = state.startAt;
-    state.particles.length = 0;
-    state.floatingText.length = 0;
+    state.particles.forEach((particle) => { particle.active = false; });
+    state.floatingText.forEach((item) => { item.active = false; });
+    state.particleCursor = 0;
+    state.floatingTextCursor = 0;
+    state.effectAccumulator = 0;
     state.playerAction = null;
     state.enemyAction = null;
+    state.pendingWaveAdvanceAt = 0;
     document.body.classList.add('game-active');
     window.scrollTo(0, 0);
     loadEnemy();
@@ -156,6 +181,9 @@
     state.startAt += pausedFor;
     state.wordDeadline += pausedFor;
     state.roundStartedAt += pausedFor;
+    if (state.playerAction) state.playerAction.started += pausedFor;
+    if (state.enemyAction) state.enemyAction.started += pausedFor;
+    if (state.pendingWaveAdvanceAt) state.pendingWaveAdvanceAt += pausedFor;
     state.mode = 'playing';
     $('pausePanel').classList.add('hidden');
     $('typingInput').disabled = false;
@@ -211,15 +239,29 @@
     for (let i = 0; i < amount; i += 1) {
       const angle = Math.random() * Math.PI * 2;
       const speed = 1.8 + Math.random() * 6;
-      state.particles.push({
-        x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-        life: 1, decay: .02 + Math.random() * .035, size: 2 + Math.random() * 6, color
-      });
+      const particle = state.particles[state.particleCursor];
+      state.particleCursor = (state.particleCursor + 1) % state.particles.length;
+      particle.active = true;
+      particle.x = x;
+      particle.y = y;
+      particle.vx = Math.cos(angle) * speed;
+      particle.vy = Math.sin(angle) * speed;
+      particle.life = 1;
+      particle.decay = .02 + Math.random() * .035;
+      particle.size = 2 + Math.random() * 6;
+      particle.color = color;
     }
   }
 
   function addFloat(text, x, y, color) {
-    state.floatingText.push({ text, x, y, color, life: 1 });
+    const item = state.floatingText[state.floatingTextCursor];
+    state.floatingTextCursor = (state.floatingTextCursor + 1) % state.floatingText.length;
+    item.active = true;
+    item.text = text;
+    item.x = x;
+    item.y = y;
+    item.color = color;
+    item.life = 1;
   }
 
   function lightAttack() {
@@ -262,19 +304,7 @@
 
     if (state.enemyHp <= 0) {
       state.enemyAction = { type: 'defeated', started: now, duration: 900 };
-      setTimeout(() => {
-        if (state.mode !== 'playing') return;
-        if (state.wave === ENEMIES.length - 1) finishGame(true);
-        else {
-          state.wave += 1;
-          state.wordIndex = 0;
-          state.typed = '';
-          state.playerHp = Math.min(100, state.playerHp + 15);
-          loadEnemy();
-          resetWordDeadline();
-          updateUi();
-        }
-      }, 900);
+      state.pendingWaveAdvanceAt = now + 900;
     }
     updateUi();
   }
@@ -367,6 +397,10 @@
     $('playerHpText').textContent = Math.ceil(state.playerHp);
     $('enemyHpText').textContent = Math.ceil(state.enemyHp);
     $('comboText').textContent = `x${state.combo}`;
+    updateLiveStats();
+  }
+
+  function updateLiveStats() {
     $('wpmValue').textContent = getWpm();
     $('accuracyValue').textContent = `${getAccuracy()}%`;
     $('rankValue').textContent = getRank();
@@ -405,77 +439,81 @@
     return Math.min((now - action.started) / action.duration, 1);
   }
 
-  function drawBackground(now) {
-    const g = ctx.createLinearGradient(0, 0, 0, 720);
+  function buildBackgroundCache() {
+    const bg = backgroundCanvas.getContext('2d', { alpha: false });
+    const g = bg.createLinearGradient(0, 0, 0, 720);
     g.addColorStop(0, '#172332');
     g.addColorStop(.55, '#26394a');
     g.addColorStop(1, '#111820');
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1280, 720);
+    bg.fillStyle = g;
+    bg.fillRect(0, 0, 1280, 720);
 
     // Luna suave y montañas planas: una escena clásica, sin luces de neón.
-    ctx.save();
-    ctx.globalAlpha = .18;
-    const moon = ctx.createRadialGradient(1005, 145, 8, 1025, 170, 72);
+    bg.save();
+    bg.globalAlpha = .18;
+    const moon = bg.createRadialGradient(1005, 145, 8, 1025, 170, 72);
     moon.addColorStop(0, '#f4efe2');
     moon.addColorStop(.72, '#d8d8ce');
     moon.addColorStop(1, '#aeb7b4');
-    ctx.fillStyle = moon;
-    ctx.beginPath(); ctx.arc(1025, 170, 72, 0, Math.PI * 2); ctx.fill();
-    ctx.globalAlpha = .07;
-    ctx.fillStyle = '#52616a';
-    ctx.beginPath(); ctx.arc(1000, 145, 13, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(1052, 188, 9, 0, Math.PI * 2); ctx.fill();
-    ctx.restore();
+    bg.fillStyle = moon;
+    bg.beginPath(); bg.arc(1025, 170, 72, 0, Math.PI * 2); bg.fill();
+    bg.globalAlpha = .07;
+    bg.fillStyle = '#52616a';
+    bg.beginPath(); bg.arc(1000, 145, 13, 0, Math.PI * 2); bg.fill();
+    bg.beginPath(); bg.arc(1052, 188, 9, 0, Math.PI * 2); bg.fill();
+    bg.restore();
 
-    ctx.fillStyle = '#1b2a37';
-    ctx.beginPath();
-    ctx.moveTo(0, 440); ctx.lineTo(185, 245); ctx.lineTo(330, 420);
-    ctx.lineTo(515, 210); ctx.lineTo(710, 430); ctx.lineTo(900, 265);
-    ctx.lineTo(1080, 420); ctx.lineTo(1200, 300); ctx.lineTo(1280, 390);
-    ctx.lineTo(1280, 535); ctx.lineTo(0, 535); ctx.closePath(); ctx.fill();
+    bg.fillStyle = '#1b2a37';
+    bg.beginPath();
+    bg.moveTo(0, 440); bg.lineTo(185, 245); bg.lineTo(330, 420);
+    bg.lineTo(515, 210); bg.lineTo(710, 430); bg.lineTo(900, 265);
+    bg.lineTo(1080, 420); bg.lineTo(1200, 300); bg.lineTo(1280, 390);
+    bg.lineTo(1280, 535); bg.lineTo(0, 535); bg.closePath(); bg.fill();
 
-    ctx.fillStyle = '#223341';
-    ctx.beginPath();
-    ctx.moveTo(0, 480); ctx.lineTo(120, 350); ctx.lineTo(250, 470);
-    ctx.lineTo(410, 330); ctx.lineTo(565, 475); ctx.lineTo(755, 335);
-    ctx.lineTo(930, 468); ctx.lineTo(1080, 350); ctx.lineTo(1280, 470);
-    ctx.lineTo(1280, 560); ctx.lineTo(0, 560); ctx.closePath(); ctx.fill();
+    bg.fillStyle = '#223341';
+    bg.beginPath();
+    bg.moveTo(0, 480); bg.lineTo(120, 350); bg.lineTo(250, 470);
+    bg.lineTo(410, 330); bg.lineTo(565, 475); bg.lineTo(755, 335);
+    bg.lineTo(930, 468); bg.lineTo(1080, 350); bg.lineTo(1280, 470);
+    bg.lineTo(1280, 560); bg.lineTo(0, 560); bg.closePath(); bg.fill();
 
     // Estructura de entrenamiento al fondo.
-    ctx.fillStyle = '#151e26';
-    ctx.fillRect(555, 298, 18, 242);
-    ctx.fillRect(710, 298, 18, 242);
-    ctx.fillRect(515, 292, 255, 18);
-    ctx.fillRect(542, 325, 200, 12);
+    bg.fillStyle = '#151e26';
+    bg.fillRect(555, 298, 18, 242);
+    bg.fillRect(710, 298, 18, 242);
+    bg.fillRect(515, 292, 255, 18);
+    bg.fillRect(542, 325, 200, 12);
 
-    const floor = ctx.createLinearGradient(0, 500, 0, 720);
+    const floor = bg.createLinearGradient(0, 500, 0, 720);
     floor.addColorStop(0, '#26343d');
     floor.addColorStop(1, '#11181e');
-    ctx.fillStyle = floor;
-    ctx.fillRect(0, 520, 1280, 200);
-    ctx.strokeStyle = 'rgba(225,232,226,.12)';
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(0, 522); ctx.lineTo(1280, 522); ctx.stroke();
+    bg.fillStyle = floor;
+    bg.fillRect(0, 520, 1280, 200);
+    bg.strokeStyle = 'rgba(225,232,226,.12)';
+    bg.lineWidth = 2;
+    bg.beginPath(); bg.moveTo(0, 522); bg.lineTo(1280, 522); bg.stroke();
     for (let y = 570; y < 721; y += 48) {
-      ctx.strokeStyle = 'rgba(225,232,226,.045)';
-      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1280, y); ctx.stroke();
+      bg.strokeStyle = 'rgba(225,232,226,.045)';
+      bg.beginPath(); bg.moveTo(0, y); bg.lineTo(1280, y); bg.stroke();
     }
 
-    // Polvo ambiental en movimiento lento.
+    bg.font = '800 16px ui-monospace, monospace';
+    bg.textAlign = 'center';
+    bg.fillStyle = 'rgba(238,239,232,.16)';
+    bg.fillText('CAMPO DE ENTRENAMIENTO · DESCO', 640, 168);
+  }
+
+  function drawBackground(now) {
+    ctx.drawImage(backgroundCanvas, 0, 0);
+    // Solo el polvo se calcula en cada cuadro; el resto del escenario está precalculado.
     ctx.fillStyle = '#d9e0da';
-    for (let i = 0; i < 30; i += 1) {
+    for (let i = 0; i < 24; i += 1) {
       const x = (i * 83 + now * (.006 + (i % 3) * .003)) % 1320 - 20;
       const y = 105 + ((i * 67) % 385) + Math.sin(now * .0005 + i) * 8;
       ctx.globalAlpha = .08 + (i % 4) * .025;
       ctx.beginPath(); ctx.arc(x, y, 1 + (i % 2), 0, Math.PI * 2); ctx.fill();
     }
     ctx.globalAlpha = 1;
-
-    ctx.font = '800 16px ui-monospace, monospace';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(238,239,232,.16)';
-    ctx.fillText('CAMPO DE ENTRENAMIENTO · DESCO', 640, 168);
   }
 
   function drawStickman(x, groundY, scale, color, facing, action, now, isEnemy = false) {
@@ -563,6 +601,7 @@
 
   function drawEffects() {
     state.particles.forEach((particle) => {
+      if (!particle.active) return;
       ctx.globalAlpha = particle.life;
       ctx.fillStyle = particle.color;
       ctx.shadowBlur = 0;
@@ -570,6 +609,7 @@
     });
     ctx.shadowBlur = 0;
     state.floatingText.forEach((item) => {
+      if (!item.active) return;
       ctx.globalAlpha = item.life;
       ctx.fillStyle = item.color;
       ctx.font = '900 23px ui-monospace, monospace';
@@ -581,14 +621,19 @@
 
   function tickEffects(delta) {
     state.particles.forEach((p) => {
+      if (!p.active) return;
       p.x += p.vx * delta * .07;
       p.y += p.vy * delta * .07;
       p.vy += .016 * delta;
       p.life -= p.decay * delta * .06;
+      if (p.life <= 0) p.active = false;
     });
-    state.particles = state.particles.filter((p) => p.life > 0);
-    state.floatingText.forEach((f) => { f.y -= delta * .04; f.life -= delta * .0013; });
-    state.floatingText = state.floatingText.filter((f) => f.life > 0);
+    state.floatingText.forEach((f) => {
+      if (!f.active) return;
+      f.y -= delta * .04;
+      f.life -= delta * .0013;
+      if (f.life <= 0) f.active = false;
+    });
   }
 
   function updateCombat(now) {
@@ -607,17 +652,57 @@
       enemyAttack('timeout');
       resetWordDeadline(now);
     }
+    if (state.pendingWaveAdvanceAt && now >= state.pendingWaveAdvanceAt) {
+      state.pendingWaveAdvanceAt = 0;
+      if (state.wave === ENEMIES.length - 1) finishGame(true);
+      else {
+        state.wave += 1;
+        state.wordIndex = 0;
+        state.typed = '';
+        state.playerHp = Math.min(100, state.playerHp + 15);
+        loadEnemy();
+        resetWordDeadline(now);
+        updateUi();
+      }
+    }
     if (state.playerAction && actionProgress(state.playerAction, now) >= 1) state.playerAction = null;
     if (state.enemyAction && actionProgress(state.enemyAction, now) >= 1 && state.enemyAction.type !== 'defeated') state.enemyAction = null;
-    if (Math.floor(now / 250) !== Math.floor((now - 16) / 250)) updateUi();
+    if (now - state.lastHudUpdate >= 250) {
+      state.lastHudUpdate = now;
+      updateLiveStats();
+    }
   }
 
   function render(now) {
-    const delta = Math.min(now - (state.lastFrame || now), 40);
+    if (document.hidden) {
+      state.lastFrame = now;
+      state.lastRender = now;
+      state.nextRenderAt = 0;
+      requestAnimationFrame(render);
+      return;
+    }
+    if (state.mode === 'paused') {
+      state.lastFrame = now;
+      state.nextRenderAt = 0;
+      requestAnimationFrame(render);
+      return;
+    }
+    if (state.nextRenderAt && now < state.nextRenderAt) {
+      requestAnimationFrame(render);
+      return;
+    }
+    if (!state.nextRenderAt || now - state.nextRenderAt > 250) state.nextRenderAt = now + TARGET_FRAME_MS;
+    else while (state.nextRenderAt <= now) state.nextRenderAt += TARGET_FRAME_MS;
+    state.lastRender = now;
+    const delta = Math.min(now - (state.lastFrame || now), MAX_FRAME_DELTA);
     state.lastFrame = now;
     state.sceneTime += delta;
     updateCombat(now);
-    tickEffects(delta);
+    state.effectAccumulator = Math.min(state.effectAccumulator + delta, MAX_FRAME_DELTA * 2);
+    while (state.effectAccumulator >= TARGET_FRAME_MS) {
+      tickEffects(TARGET_FRAME_MS);
+      state.effectAccumulator -= TARGET_FRAME_MS;
+    }
     state.shake *= .83;
     state.flash *= .88;
 
@@ -723,5 +808,6 @@
   updateSoundLabels();
   applyTheme();
   updateBest();
+  buildBackgroundCache();
   requestAnimationFrame(render);
 })();
