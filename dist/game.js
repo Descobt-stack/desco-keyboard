@@ -4,6 +4,8 @@
   const $ = (id) => document.getElementById(id);
   const canvas = $('arena');
   const ctx = canvas.getContext('2d');
+  const PLAYER_X = 405;
+  const ENEMY_X = 875;
 
   const LEVELS = window.DESCO_PHRASE_LEVELS;
   if (!LEVELS) throw new Error('No se pudo cargar el banco de frases.');
@@ -221,7 +223,12 @@
   }
 
   function lightAttack() {
-    state.playerAction = { type: 'jab', started: performance.now(), duration: 235, alternate: state.correctKeys % 2 };
+    const now = performance.now();
+    if (state.playerAction && ['jab', 'heavy', 'kick'].includes(state.playerAction.type)
+      && actionProgress(state.playerAction, now) < .8) return;
+    state.playerAction = { type: 'jab', started: now, duration: 340, alternate: state.correctKeys % 2,
+      impactAt: .38, impact: { x: ENEMY_X, y: 365, color: '#f7f7f2', amount: 4 } };
+    state.enemyAction = { type: 'hit', started: now, duration: 370 };
     tone(190 + (state.correctKeys % 5) * 18, .025, 'square', .012);
   }
 
@@ -237,7 +244,8 @@
     state.enemyHp = Math.max(0, state.enemyHp - damage);
     state.playerAction = {
       type: state.combo % 4 === 0 ? 'kick' : 'heavy', started: now, duration: 620,
-      impact: { x: 772, y: 355, color: state.combo % 4 === 0 ? '#d8b45a' : '#f7f7f2', amount: 12,
+      impact: { x: ENEMY_X, y: state.combo % 4 === 0 ? 445 : 360,
+        color: state.combo % 4 === 0 ? '#d8b45a' : '#f7f7f2', amount: 12,
         label: `+${Math.round(damage)}`, labelX: 832, labelY: 332, labelColor: '#ffd35a' }
     };
     state.enemyAction = { type: 'hit', started: now, duration: 570 };
@@ -278,7 +286,7 @@
     state.playerHp = Math.max(0, state.playerHp - damage);
     state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
     state.enemyAction = { type: 'counter', started: performance.now(), duration: 560,
-      impact: { x: 490, y: 355, color: '#ff5368', amount: 12,
+      impact: { x: PLAYER_X, y: 360, color: '#ff5368', amount: 12,
         label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
     $('typingInput').closest('.input-shell').classList.remove('error');
     void $('typingInput').offsetWidth;
@@ -295,7 +303,7 @@
     state.playerHp = Math.max(0, state.playerHp - damage);
     state.combo = 0;
     state.enemyAction = { type: 'attack', started: performance.now(), duration: 560,
-      impact: { x: 490, y: 355, color: currentEnemy().color, amount: 15,
+      impact: { x: PLAYER_X, y: 360, color: currentEnemy().color, amount: 15,
         label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
     state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
     tone(65, .16, 'square', .06);
@@ -482,12 +490,13 @@
     const striking = ['jab', 'heavy', 'kick', 'attack', 'counter'].includes(type);
     const isKick = type === 'kick';
     const strike = striking ? windowed(0, type === 'jab' ? .38 : .47, .84) : 0;
-    const dash = striking ? windowed(.05, .48, .94) : 0;
-    const recoil = type === 'hit' ? windowed(.34, .59, 1) : 0;
-    const fall = type === 'defeated' ? smooth((p - .28) / .62) : 0;
+    const dash = striking ? windowed(.05, type === 'jab' ? .38 : .47, .94) : 0;
+    const recoil = type === 'hit' ? windowed(.48, .68, 1) : 0;
+    const fall = type === 'defeated' ? smooth((p - .36) / .54) : 0;
     const spawn = type === 'spawn' ? 1 - easeOut(p) : 0;
     const reach = type === 'jab' ? 41 : isKick ? 40 : 92;
-    const travel = type === 'jab' ? 25 : isKick ? 305 : 320;
+    // Cada golpe llega al torso rival antes de que empiece la reacción.
+    const travel = type === 'jab' ? 350 : isKick ? 305 : 295;
     const offsetX = facing * (dash * travel - recoil * 52 - fall * 72);
     const offsetY = -spawn * 120 - (isKick ? Math.sin(p * Math.PI) * 13 : 0) + recoil * 10 + fall * 76 + idle * (striking ? .4 : 1.8);
     const lean = strike * (isKick ? -.18 : .17) - recoil * .42 - fall * 1.15 + idle * .018;
@@ -512,7 +521,7 @@
     const backFoot = { x: -43 - dash * 16 - step * 3, y: -4 };
     const alternating = type === 'jab' && action.alternate;
     const frontHand = { x: 46 + (alternating ? strike * 8 : strike * reach) + idle * 4, y: -146 - strike * 10 + idle * 4 };
-    const backHand = { x: -29 + (alternating ? strike * reach : strike * 18), y: -142 - (alternating ? strike * 21 : 0) - idle * 4 };
+    const backHand = { x: -29 + (alternating ? strike * 112 : strike * 18), y: -142 - (alternating ? strike * 14 : 0) - idle * 4 };
 
     const drawLimb = (...points) => {
       ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
@@ -526,6 +535,11 @@
     drawLimb(hip, chest);
     drawLimb(chest, { x: -22 + (alternating ? strike * 23 : 0), y: -151 + crouch * .3 }, backHand);
     drawLimb(chest, { x: 28 + strike * reach * .42, y: -159 + crouch * .3 }, frontHand);
+    if (striking && !isKick && strike > .2) {
+      const fist = alternating ? backHand : frontHand;
+      ctx.beginPath(); ctx.arc(fist.x, fist.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+    }
 
     ctx.fillStyle = color;
     ctx.strokeStyle = '#11171c';
@@ -580,12 +594,12 @@
   function updateCombat(now) {
     if (state.mode !== 'playing') return;
     for (const action of [state.playerAction, state.enemyAction]) {
-      if (!action?.impact || action.impactDone || actionProgress(action, now) < .46) continue;
+      if (!action?.impact || action.impactDone || actionProgress(action, now) < (action.impactAt ?? .46)) continue;
       const hit = action.impact;
       createImpact(hit.x, hit.y, hit.color, hit.amount);
-      addFloat(hit.label, hit.labelX, hit.labelY, hit.labelColor);
-      state.shake = action.type === 'kick' ? 12 : 8;
-      state.flash = .32;
+      if (hit.label) addFloat(hit.label, hit.labelX, hit.labelY, hit.labelColor);
+      state.shake = action.type === 'jab' ? 1.6 : action.type === 'kick' ? 12 : 8;
+      state.flash = action.type === 'jab' ? .04 : .32;
       action.impactDone = true;
       if (state.enemyHp <= 0 && action === state.playerAction) addFloat('¡RIVAL VENCIDO!', 640, 250, '#ffd35a');
     }
@@ -610,10 +624,10 @@
     ctx.save();
     if (state.shake > .2) ctx.translate((Math.random() - .5) * state.shake, (Math.random() - .5) * state.shake);
     drawBackground(now);
-    const playerX = 405 + Math.sin(now * .0007) * 24;
-    const enemyX = 875 + Math.sin(now * .00062 + Math.PI) * 30;
-    drawStickman(playerX, 535, 1.08, '#f7f7f2', 1, state.playerAction, now, false);
-    drawStickman(enemyX, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
+    const playerAttacking = ['jab', 'heavy', 'kick'].includes(state.playerAction?.type);
+    if (playerAttacking) drawStickman(ENEMY_X, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
+    drawStickman(PLAYER_X, 535, 1.08, '#f7f7f2', 1, state.playerAction, now, false);
+    if (!playerAttacking) drawStickman(ENEMY_X, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
     drawEffects();
     if (state.flash > .01) {
       ctx.fillStyle = `rgba(255,255,255,${state.flash * .2})`;
