@@ -60,7 +60,7 @@ Los botones de la arena permiten volver al inicio, pausar, abrir ajustes y consu
 
 ## Animación Canvas
 
-Los personajes no son imágenes. `drawStickman()` construye cada figura con líneas, círculos y articulaciones. Incluso en reposo, ambos personajes cambian de guardia, postura y posición de forma autónoma. Las acciones cambian las coordenadas de brazos, piernas y cuerpo mediante interpolación temporal:
+Los personajes no son imágenes. `drawStickman()` construye cada figura con líneas, círculos y articulaciones. La dirección visual utiliza rellenos mate, contornos oscuros y cintas de combate, sin resplandores LED. Incluso en reposo, ambos personajes cambian de guardia, postura y posición de forma autónoma. Las acciones cambian las coordenadas de brazos, piernas y cuerpo mediante interpolación temporal:
 
 - `jab`: golpe ligero por letra;
 - `heavy`: golpe fuerte por palabra;

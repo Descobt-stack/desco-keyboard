@@ -7,7 +7,7 @@ Juego web de mecanografía en español con combates stickman. Cada letra correct
 - Tres dificultades: Principiante, Intermedio y Experto.
 - 150 frases revisadas en español: 50 diferentes por dificultad y cinco secciones por partida.
 - El nivel Principiante no exige signos; Intermedio y Experto sí practican acentos y puntuación.
-- Animación procedural en HTML5 Canvas a 60 FPS.
+- Animación procedural en HTML5 Canvas a 60 FPS con stickman clásicos, contornos sólidos y colores mate.
 - PPM, precisión, combo, rango y barras de salud en tiempo real.
 - Cinco rivales por entrenamiento, con colores, salud y secciones diferentes.
 - Tiempo oculto por palabra: 5 s en Principiante, 3.5 s en Intermedio y 2.4 s en Experto.
@@ -17,6 +17,7 @@ Juego web de mecanografía en español con combates stickman. Cada letra correct
 - Pausa automática al cambiar de pestaña o minimizar el navegador.
 - Tema oscuro y claro seleccionable desde Ajustes.
 - Movimiento autónomo de guardia, desplazamiento y respiración para ambos stickman.
+- Escenario de montaña y campo de entrenamiento sin efectos de neón.
 - Sonido generado con Web Audio, sin archivos externos.
 - Mejor marca guardada localmente en el navegador.
 - Diseño adaptable para computadora, tableta y teléfono.

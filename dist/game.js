@@ -9,11 +9,11 @@
   if (!LEVELS) throw new Error('No se pudo cargar el banco de frases.');
 
   const ENEMIES = [
-    { name: 'CARMESÍ', color: '#ef3340', hp: 72 },
-    { name: 'BRASA', color: '#ff7a28', hp: 82 },
-    { name: 'ÁMBAR', color: '#f4b942', hp: 92 },
-    { name: 'MAGENTA', color: '#dc3f8f', hp: 104 },
-    { name: 'VÓRTICE', color: '#7a4de8', hp: 116 }
+    { name: 'CARMESÍ', color: '#c84545', hp: 72 },
+    { name: 'BRASA', color: '#d66b36', hp: 82 },
+    { name: 'ÁMBAR', color: '#c49a38', hp: 92 },
+    { name: 'MAGENTA', color: '#9d4c70', hp: 104 },
+    { name: 'VÓRTICE', color: '#6f5b9f', hp: 116 }
   ];
 
   const state = {
@@ -403,50 +403,75 @@
 
   function drawBackground(now) {
     const g = ctx.createLinearGradient(0, 0, 0, 720);
-    g.addColorStop(0, '#0a0d1c');
-    g.addColorStop(.58, '#11162a');
-    g.addColorStop(1, '#080a12');
+    g.addColorStop(0, '#172332');
+    g.addColorStop(.55, '#26394a');
+    g.addColorStop(1, '#111820');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 1280, 720);
 
+    // Luna suave y montañas planas: una escena clásica, sin luces de neón.
     ctx.save();
-    ctx.globalAlpha = .45;
-    for (let i = 0; i < 17; i += 1) {
-      const x = i * 92 - 30;
-      const height = 110 + ((i * 71) % 240);
-      ctx.fillStyle = i % 2 ? '#11182e' : '#0e1427';
-      ctx.fillRect(x, 500 - height, 72, height);
-      ctx.fillStyle = 'rgba(94,231,245,.16)';
-      for (let w = 0; w < 3; w += 1) {
-        for (let h = 0; h < Math.floor(height / 42); h += 1) {
-          if ((w + h + i) % 3 === 0) ctx.fillRect(x + 10 + w * 20, 510 - height + h * 32, 7, 12);
-        }
-      }
-    }
+    ctx.globalAlpha = .18;
+    const moon = ctx.createRadialGradient(1005, 145, 8, 1025, 170, 72);
+    moon.addColorStop(0, '#f4efe2');
+    moon.addColorStop(.72, '#d8d8ce');
+    moon.addColorStop(1, '#aeb7b4');
+    ctx.fillStyle = moon;
+    ctx.beginPath(); ctx.arc(1025, 170, 72, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = .07;
+    ctx.fillStyle = '#52616a';
+    ctx.beginPath(); ctx.arc(1000, 145, 13, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(1052, 188, 9, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
 
-    ctx.strokeStyle = 'rgba(94,231,245,.09)';
-    ctx.lineWidth = 1;
-    const gridOffset = (now * .018) % 48;
-    for (let x = -48 + gridOffset; x < 1320; x += 48) {
-      ctx.beginPath(); ctx.moveTo(640, 485); ctx.lineTo(x, 720); ctx.stroke();
-    }
-    for (let y = 495; y < 720; y += 38) {
+    ctx.fillStyle = '#1b2a37';
+    ctx.beginPath();
+    ctx.moveTo(0, 440); ctx.lineTo(185, 245); ctx.lineTo(330, 420);
+    ctx.lineTo(515, 210); ctx.lineTo(710, 430); ctx.lineTo(900, 265);
+    ctx.lineTo(1080, 420); ctx.lineTo(1200, 300); ctx.lineTo(1280, 390);
+    ctx.lineTo(1280, 535); ctx.lineTo(0, 535); ctx.closePath(); ctx.fill();
+
+    ctx.fillStyle = '#223341';
+    ctx.beginPath();
+    ctx.moveTo(0, 480); ctx.lineTo(120, 350); ctx.lineTo(250, 470);
+    ctx.lineTo(410, 330); ctx.lineTo(565, 475); ctx.lineTo(755, 335);
+    ctx.lineTo(930, 468); ctx.lineTo(1080, 350); ctx.lineTo(1280, 470);
+    ctx.lineTo(1280, 560); ctx.lineTo(0, 560); ctx.closePath(); ctx.fill();
+
+    // Estructura de entrenamiento al fondo.
+    ctx.fillStyle = '#151e26';
+    ctx.fillRect(555, 298, 18, 242);
+    ctx.fillRect(710, 298, 18, 242);
+    ctx.fillRect(515, 292, 255, 18);
+    ctx.fillRect(542, 325, 200, 12);
+
+    const floor = ctx.createLinearGradient(0, 500, 0, 720);
+    floor.addColorStop(0, '#26343d');
+    floor.addColorStop(1, '#11181e');
+    ctx.fillStyle = floor;
+    ctx.fillRect(0, 520, 1280, 200);
+    ctx.strokeStyle = 'rgba(225,232,226,.12)';
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(0, 522); ctx.lineTo(1280, 522); ctx.stroke();
+    for (let y = 570; y < 721; y += 48) {
+      ctx.strokeStyle = 'rgba(225,232,226,.045)';
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(1280, y); ctx.stroke();
     }
-    ctx.fillStyle = 'rgba(94,231,245,.05)';
-    ctx.fillRect(0, 486, 1280, 2);
 
-    const glow = ctx.createRadialGradient(640, 455, 20, 640, 455, 340);
-    glow.addColorStop(0, 'rgba(140,108,255,.15)');
-    glow.addColorStop(1, 'rgba(140,108,255,0)');
-    ctx.fillStyle = glow;
-    ctx.fillRect(250, 100, 780, 540);
+    // Polvo ambiental en movimiento lento.
+    ctx.fillStyle = '#d9e0da';
+    for (let i = 0; i < 30; i += 1) {
+      const x = (i * 83 + now * (.006 + (i % 3) * .003)) % 1320 - 20;
+      const y = 105 + ((i * 67) % 385) + Math.sin(now * .0005 + i) * 8;
+      ctx.globalAlpha = .08 + (i % 4) * .025;
+      ctx.beginPath(); ctx.arc(x, y, 1 + (i % 2), 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
 
-    ctx.font = '900 18px ui-monospace, monospace';
+    ctx.font = '800 16px ui-monospace, monospace';
     ctx.textAlign = 'center';
-    ctx.fillStyle = 'rgba(255,255,255,.05)';
-    ctx.fillText('DESCO // TRAINING GRID 07', 640, 155);
+    ctx.fillStyle = 'rgba(238,239,232,.16)';
+    ctx.fillText('CAMPO DE ENTRENAMIENTO · DESCO', 640, 168);
   }
 
   function drawStickman(x, groundY, scale, color, facing, action, now, isEnemy = false) {
@@ -492,13 +517,10 @@
     ctx.rotate(lean * facing);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = color;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 9;
+    ctx.shadowBlur = 0;
 
-    ctx.globalAlpha = .18;
-    ctx.beginPath(); ctx.ellipse(0, 5, 47, 10, 0, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+    ctx.globalAlpha = .22;
+    ctx.beginPath(); ctx.ellipse(0, 5, 50, 10, 0, 0, Math.PI * 2); ctx.fillStyle = '#05080a'; ctx.fill();
     ctx.globalAlpha = 1;
 
     const hip = { x: 0, y: -92 };
@@ -509,17 +531,32 @@
     const frontHand = { x: 45 + punch + idleGuard * 4, y: -151 - punch * .08 + idleGuard * 5 };
     const backHand = { x: -35 - idleGuard * 3, y: -132 - idleGuard * 6 };
 
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(-18, -48); ctx.lineTo(backFoot.x, backFoot.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(24 + kick * .25, -48 - kick * .18); ctx.lineTo(frontFoot.x, frontFoot.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(hip.x, hip.y); ctx.lineTo(chest.x, chest.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(chest.x, chest.y); ctx.lineTo(-20, -145); ctx.lineTo(backHand.x, backHand.y); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(chest.x, chest.y); ctx.lineTo(27 + punch * .28, -162); ctx.lineTo(frontHand.x, frontHand.y); ctx.stroke();
+    const drawLimb = (...points) => {
+      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
+      points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+      ctx.strokeStyle = '#11171c'; ctx.lineWidth = 13; ctx.stroke();
+      ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.stroke();
+    };
 
-    ctx.fillStyle = '#080b14';
-    ctx.beginPath(); ctx.arc(head.x, head.y, 28, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    drawLimb(hip, { x: -18, y: -48 }, backFoot);
+    drawLimb(hip, { x: 24 + kick * .25, y: -48 - kick * .18 }, frontFoot);
+    drawLimb(hip, chest);
+    drawLimb(chest, { x: -20, y: -145 }, backHand);
+    drawLimb(chest, { x: 27 + punch * .28, y: -162 }, frontHand);
+
     ctx.fillStyle = color;
-    ctx.shadowBlur = 10;
-    ctx.beginPath(); ctx.arc(11, -214, 4, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#11171c';
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.arc(head.x, head.y, 29, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    const bandColor = isEnemy ? '#e2b44a' : '#b53d3d';
+    ctx.strokeStyle = '#11171c'; ctx.lineWidth = 9;
+    ctx.beginPath(); ctx.moveTo(-29, -212); ctx.lineTo(30, -207); ctx.stroke();
+    ctx.strokeStyle = bandColor; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(-31, -212); ctx.lineTo(31, -207); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(29, -208); ctx.lineTo(50, -202 + idleGuard * 2); ctx.stroke();
+    ctx.fillStyle = '#11171c';
+    ctx.beginPath(); ctx.arc(11, -216, 3.5, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -527,9 +564,8 @@
     state.particles.forEach((particle) => {
       ctx.globalAlpha = particle.life;
       ctx.fillStyle = particle.color;
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = particle.color;
-      ctx.fillRect(particle.x, particle.y, particle.size, particle.size);
+      ctx.shadowBlur = 0;
+      ctx.beginPath(); ctx.arc(particle.x, particle.y, particle.size * .55, 0, Math.PI * 2); ctx.fill();
     });
     ctx.shadowBlur = 0;
     state.floatingText.forEach((item) => {
