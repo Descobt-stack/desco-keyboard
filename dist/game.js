@@ -221,8 +221,7 @@
   }
 
   function lightAttack() {
-    state.playerAction = { type: 'jab', started: performance.now(), duration: 180 };
-    createImpact(840, 403, '#f7f7f2', 4);
+    state.playerAction = { type: 'jab', started: performance.now(), duration: 235, alternate: state.correctKeys % 2 };
     tone(190 + (state.correctKeys % 5) * 18, .025, 'square', .012);
   }
 
@@ -236,12 +235,12 @@
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     state.enemyHp = Math.max(0, state.enemyHp - damage);
-    state.playerAction = { type: state.combo % 4 === 0 ? 'kick' : 'heavy', started: now, duration: 420 };
-    state.enemyAction = { type: 'hit', started: now, duration: 390 };
-    state.shake = state.combo % 4 === 0 ? 12 : 7;
-    state.flash = .32;
-    createImpact(850, 398, state.combo % 4 === 0 ? '#ffd35a' : '#f7f7f2', 18);
-    addFloat(`+${Math.round(damage)}`, 840, 350, '#ffd35a');
+    state.playerAction = {
+      type: state.combo % 4 === 0 ? 'kick' : 'heavy', started: now, duration: 620,
+      impact: { x: 772, y: 355, color: state.combo % 4 === 0 ? '#d8b45a' : '#f7f7f2', amount: 12,
+        label: `+${Math.round(damage)}`, labelX: 832, labelY: 332, labelColor: '#ffd35a' }
+    };
+    state.enemyAction = { type: 'hit', started: now, duration: 570 };
     tone(state.combo % 4 === 0 ? 95 : 130, .09, 'sawtooth', .06);
 
     if (!sentenceComplete) {
@@ -255,7 +254,6 @@
 
     if (state.enemyHp <= 0) {
       state.enemyAction = { type: 'defeated', started: now, duration: 900 };
-      addFloat('¡RIVAL VENCIDO!', 640, 250, '#ffd35a');
       setTimeout(() => {
         if (state.mode !== 'playing') return;
         if (state.wave === ENEMIES.length - 1) finishGame(true);
@@ -278,11 +276,10 @@
     state.wrongKeys += 1;
     state.combo = 0;
     state.playerHp = Math.max(0, state.playerHp - damage);
-    state.playerAction = { type: 'hit', started: performance.now(), duration: 320 };
-    state.enemyAction = { type: 'counter', started: performance.now(), duration: 360 };
-    state.shake = 9;
-    createImpact(430, 410, '#ff5368', 12);
-    addFloat(`-${damage}`, 440, 350, '#ff5368');
+    state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
+    state.enemyAction = { type: 'counter', started: performance.now(), duration: 560,
+      impact: { x: 490, y: 355, color: '#ff5368', amount: 12,
+        label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
     $('typingInput').closest('.input-shell').classList.remove('error');
     void $('typingInput').offsetWidth;
     $('typingInput').closest('.input-shell').classList.add('error');
@@ -297,11 +294,10 @@
     const damage = reason === 'timeout' ? currentLevel().timeoutDamage : currentLevel().typoDamage;
     state.playerHp = Math.max(0, state.playerHp - damage);
     state.combo = 0;
-    state.enemyAction = { type: 'attack', started: performance.now(), duration: 460 };
-    state.playerAction = { type: 'hit', started: performance.now(), duration: 360 };
-    state.shake = 11;
-    createImpact(435, 405, currentEnemy().color, 15);
-    addFloat(`-${damage}`, 440, 350, '#ff5368');
+    state.enemyAction = { type: 'attack', started: performance.now(), duration: 560,
+      impact: { x: 490, y: 355, color: currentEnemy().color, amount: 15,
+        label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
+    state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
     tone(65, .16, 'square', .06);
     if (state.playerHp <= 0) finishGame(false);
     updateUi();
@@ -477,44 +473,30 @@
   function drawStickman(x, groundY, scale, color, facing, action, now, isEnemy = false) {
     const p = actionProgress(action, now);
     const type = action?.type;
-    let lean = Math.sin(state.sceneTime * .004 + (isEnemy ? 2 : 0)) * .025;
-    let offsetX = 0;
-    let offsetY = Math.sin(state.sceneTime * .005 + (isEnemy ? 1 : 0)) * 2;
-    let punch = 0;
-    let kick = 0;
-    let hit = 0;
-    const idleGuard = Math.sin(state.sceneTime * .006 + (isEnemy ? 1.8 : 0));
-    const idleStep = Math.sin(state.sceneTime * .0032 + (isEnemy ? .8 : 0));
-
-    if (type === 'jab' || type === 'heavy' || type === 'attack' || type === 'counter') {
-      const power = type === 'jab' ? 28 : 68;
-      punch = Math.sin(p * Math.PI) * power;
-      offsetX = facing * Math.sin(p * Math.PI) * (type === 'jab' ? 8 : 22);
-      lean = facing * .12 * Math.sin(p * Math.PI);
-    }
-    if (type === 'kick') {
-      kick = Math.sin(p * Math.PI) * 85;
-      offsetX = facing * Math.sin(p * Math.PI) * 28;
-      lean = -facing * .18 * Math.sin(p * Math.PI);
-    }
-    if (type === 'hit') {
-      hit = Math.sin(p * Math.PI) * 25;
-      offsetX = -facing * hit;
-      lean = -facing * .28 * Math.sin(p * Math.PI);
-    }
-    if (type === 'spawn') {
-      offsetY -= (1 - easeOut(p)) * 120;
-    }
-    if (type === 'defeated') {
-      lean = facing * p * 1.35;
-      offsetY += p * 28;
-      offsetX -= facing * p * 60;
-    }
+    const smooth = (t) => { const v = Math.min(1, Math.max(0, t)); return v * v * (3 - 2 * v); };
+    const windowed = (start, peak, end) => p < peak
+      ? smooth((p - start) / (peak - start))
+      : 1 - smooth((p - peak) / (end - peak));
+    const idle = Math.sin(state.sceneTime * .005 + (isEnemy ? 1.5 : 0));
+    const step = Math.sin(state.sceneTime * .003 + (isEnemy ? 2 : 0));
+    const striking = ['jab', 'heavy', 'kick', 'attack', 'counter'].includes(type);
+    const isKick = type === 'kick';
+    const strike = striking ? windowed(0, type === 'jab' ? .38 : .47, .84) : 0;
+    const dash = striking ? windowed(.05, .48, .94) : 0;
+    const recoil = type === 'hit' ? windowed(.34, .59, 1) : 0;
+    const fall = type === 'defeated' ? smooth((p - .28) / .62) : 0;
+    const spawn = type === 'spawn' ? 1 - easeOut(p) : 0;
+    const reach = type === 'jab' ? 41 : isKick ? 40 : 92;
+    const travel = type === 'jab' ? 25 : isKick ? 305 : 320;
+    const offsetX = facing * (dash * travel - recoil * 52 - fall * 72);
+    const offsetY = -spawn * 120 - (isKick ? Math.sin(p * Math.PI) * 13 : 0) + recoil * 10 + fall * 76 + idle * (striking ? .4 : 1.8);
+    const lean = strike * (isKick ? -.18 : .17) - recoil * .42 - fall * 1.15 + idle * .018;
+    const crouch = striking ? windowed(0, .19, .43) * 13 : 0;
 
     ctx.save();
     ctx.translate(x + offsetX, groundY + offsetY);
     ctx.scale(scale * facing, scale);
-    ctx.rotate(lean * facing);
+    ctx.rotate(lean);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.shadowBlur = 0;
@@ -523,13 +505,14 @@
     ctx.beginPath(); ctx.ellipse(0, 5, 50, 10, 0, 0, Math.PI * 2); ctx.fillStyle = '#05080a'; ctx.fill();
     ctx.globalAlpha = 1;
 
-    const hip = { x: 0, y: -92 };
-    const chest = { x: 2, y: -165 };
-    const head = { x: 2, y: -210 };
-    const frontFoot = { x: 42 + kick * .72 + idleStep * 3, y: -4 - kick * .34 };
-    const backFoot = { x: -42 - idleStep * 3, y: -4 };
-    const frontHand = { x: 45 + punch + idleGuard * 4, y: -151 - punch * .08 + idleGuard * 5 };
-    const backHand = { x: -35 - idleGuard * 3, y: -132 - idleGuard * 6 };
+    const hip = { x: -crouch * .3, y: -92 + crouch };
+    const chest = { x: 2 + strike * 8, y: -165 + crouch * .55 };
+    const head = { x: 2 + strike * 7, y: -210 + crouch * .4 };
+    const frontFoot = { x: 43 + (isKick ? strike * 116 : 0) + step * 3, y: -4 - (isKick ? strike * 67 : 0) };
+    const backFoot = { x: -43 - dash * 16 - step * 3, y: -4 };
+    const alternating = type === 'jab' && action.alternate;
+    const frontHand = { x: 46 + (alternating ? strike * 8 : strike * reach) + idle * 4, y: -146 - strike * 10 + idle * 4 };
+    const backHand = { x: -29 + (alternating ? strike * reach : strike * 18), y: -142 - (alternating ? strike * 21 : 0) - idle * 4 };
 
     const drawLimb = (...points) => {
       ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
@@ -538,25 +521,29 @@
       ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.stroke();
     };
 
-    drawLimb(hip, { x: -18, y: -48 }, backFoot);
-    drawLimb(hip, { x: 24 + kick * .25, y: -48 - kick * .18 }, frontFoot);
+    drawLimb(hip, { x: -20 - dash * 7, y: -49 + crouch * .6 }, backFoot);
+    drawLimb(hip, { x: 26 + (isKick ? strike * 36 : 0), y: -50 - (isKick ? strike * 41 : 0) }, frontFoot);
     drawLimb(hip, chest);
-    drawLimb(chest, { x: -20, y: -145 }, backHand);
-    drawLimb(chest, { x: 27 + punch * .28, y: -162 }, frontHand);
+    drawLimb(chest, { x: -22 + (alternating ? strike * 23 : 0), y: -151 + crouch * .3 }, backHand);
+    drawLimb(chest, { x: 28 + strike * reach * .42, y: -159 + crouch * .3 }, frontHand);
 
     ctx.fillStyle = color;
     ctx.strokeStyle = '#11171c';
     ctx.lineWidth = 5;
     ctx.beginPath(); ctx.arc(head.x, head.y, 29, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
 
+    // La cinta cruza la frente; el nudo y las dos puntas salen detrás de la cabeza.
     const bandColor = isEnemy ? '#e2b44a' : '#b53d3d';
-    ctx.strokeStyle = '#11171c'; ctx.lineWidth = 9;
-    ctx.beginPath(); ctx.moveTo(-29, -212); ctx.lineTo(30, -207); ctx.stroke();
-    ctx.strokeStyle = bandColor; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(-31, -212); ctx.lineTo(31, -207); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(29, -208); ctx.lineTo(50, -202 + idleGuard * 2); ctx.stroke();
+    ctx.strokeStyle = '#11171c'; ctx.lineWidth = 11;
+    ctx.beginPath(); ctx.moveTo(head.x - 27, head.y - 10); ctx.lineTo(head.x + 26, head.y - 9); ctx.stroke();
+    ctx.strokeStyle = bandColor; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.moveTo(head.x - 28, head.y - 10); ctx.lineTo(head.x + 27, head.y - 9); ctx.stroke();
+    ctx.beginPath(); ctx.arc(head.x - 27, head.y - 10, 4, 0, Math.PI * 2); ctx.fillStyle = bandColor; ctx.fill();
+    ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(head.x - 29, head.y - 10); ctx.lineTo(head.x - 48, head.y - 7 + idle * 3 - dash * 9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(head.x - 29, head.y - 10); ctx.lineTo(head.x - 45, head.y + 1 + idle * 5 - dash * 6); ctx.stroke();
     ctx.fillStyle = '#11171c';
-    ctx.beginPath(); ctx.arc(11, -216, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(head.x + 12, head.y + 4, 3, 0, Math.PI * 2); ctx.fill();
     ctx.restore();
   }
 
@@ -592,6 +579,16 @@
 
   function updateCombat(now) {
     if (state.mode !== 'playing') return;
+    for (const action of [state.playerAction, state.enemyAction]) {
+      if (!action?.impact || action.impactDone || actionProgress(action, now) < .46) continue;
+      const hit = action.impact;
+      createImpact(hit.x, hit.y, hit.color, hit.amount);
+      addFloat(hit.label, hit.labelX, hit.labelY, hit.labelColor);
+      state.shake = action.type === 'kick' ? 12 : 8;
+      state.flash = .32;
+      action.impactDone = true;
+      if (state.enemyHp <= 0 && action === state.playerAction) addFloat('¡RIVAL VENCIDO!', 640, 250, '#ffd35a');
+    }
     if (now >= state.wordDeadline && state.enemyHp > 0) {
       enemyAttack('timeout');
       resetWordDeadline(now);
