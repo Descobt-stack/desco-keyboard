@@ -72,22 +72,43 @@
           <section class="start-panel" id="startPanel" aria-label="Menú principal">
             <p class="eyebrow">DESCO PRESENTA</p>
             <h2>KEYBOARD<br /><span>FIGHTER</span></h2>
-            <p class="start-copy">Domina el teclado en español mientras ganas cada combate.</p>
+            <p class="start-copy">Elige tu nombre, supera ocho niveles y compite en el tablero global.</p>
 
-            <div class="difficulty-grid" role="group" aria-label="Selecciona la dificultad">
-              <button class="difficulty active" type="button" data-level="novato">
-                <span>01</span><strong>Principiante</strong><small>5 s por palabra · sin puntuación</small>
-              </button>
-              <button class="difficulty" type="button" data-level="intermedio">
-                <span>02</span><strong>Intermedio</strong><small>3.5 s por palabra · puntuación</small>
-              </button>
-              <button class="difficulty" type="button" data-level="experto">
-                <span>03</span><strong>Experto</strong><small>2.4 s por palabra · máxima precisión</small>
-              </button>
+            <div class="menu-layout">
+              <div class="training-setup">
+                <label class="player-name-field" for="playerName">
+                  <span>Nombre del jugador</span>
+                  <input id="playerName" type="text" maxlength="20" autocomplete="nickname" placeholder="Escribe tu nombre" />
+                </label>
+
+                <div class="difficulty-grid" role="group" aria-label="Selecciona el nivel">
+                  <button class="difficulty active" type="button" data-level="nivel1"><span>01</span><strong>Primeros pasos</strong><small>6 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel2"><span>02</span><strong>Base firme</strong><small>5.5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel3"><span>03</span><strong>Ritmo constante</strong><small>5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel4"><span>04</span><strong>Fluidez</strong><small>4.5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel5"><span>05</span><strong>Acentos iniciales</strong><small>4 s · incluye acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel6"><span>06</span><strong>Acentos avanzados</strong><small>3.5 s · más vocabulario</small></button>
+                  <button class="difficulty" type="button" data-level="nivel7"><span>07</span><strong>Puntuación</strong><small>3 s · comas y puntos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel8"><span>08</span><strong>Dominio total</strong><small>2.4 s · signos completos</small></button>
+                </div>
+
+                <p class="level-rules" id="levelRules" aria-live="polite">Nivel 1: frases sencillas sin acentos ni signos. Puedes usar borrar, espacio y Enter.</p>
+                <button class="primary-button" id="startButton" type="button">INICIAR ENTRENAMIENTO</button>
+                <p class="form-error" id="nameError" aria-live="polite"></p>
+                <p class="keyboard-note">Usa un teclado físico para obtener la mejor experiencia.</p>
+              </div>
+
+              <aside class="leaderboard-card" aria-labelledby="leaderboardTitle">
+                <div class="leaderboard-head">
+                  <div><span>CLASIFICACIÓN</span><h3 id="leaderboardTitle">Tablero global</h3></div>
+                  <button id="refreshLeaderboard" type="button" aria-label="Actualizar tablero">Actualizar</button>
+                </div>
+                <ol id="leaderboardList" class="leaderboard-list" aria-live="polite">
+                  <li class="leaderboard-empty">Cargando jugadores…</li>
+                </ol>
+                <p id="leaderboardStatus" class="leaderboard-status">Se guarda la mejor marca de cada jugador y nivel.</p>
+              </aside>
             </div>
-
-            <button class="primary-button" id="startButton" type="button">INICIAR ENTRENAMIENTO</button>
-            <p class="keyboard-note">Usa un teclado físico para obtener la mejor experiencia.</p>
           </section>
 
           <section class="pause-panel hidden" id="pausePanel" aria-label="Juego en pausa">
@@ -106,6 +127,7 @@
               <div><span>Precisión</span><strong id="resultAccuracy">0</strong><small>%</small></div>
               <div><span>Mejor combo</span><strong id="resultCombo">0</strong><small>palabras</small></div>
             </div>
+            <p class="score-submit-status" id="scoreSubmitStatus" aria-live="polite"></p>
             <button class="primary-button" id="retryButton" type="button">VOLVER A ENTRENAR</button>
             <button class="text-button" id="menuButton" type="button">Elegir nivel</button>
           </section>
@@ -142,7 +164,7 @@
                 disabled
                 placeholder="Comienza el entrenamiento…"
               />
-              <kbd>ESPACIO</kbd>
+              <kbd>ESPACIO / ENTER</kbd>
             </label>
           </section>
         </div>
@@ -150,7 +172,7 @@
 
       <section class="feature-strip" aria-label="Características">
         <article><strong>100% en español</strong><span>Palabras, acentos y frases pensadas para practicar.</span></article>
-        <article><strong>Progreso local</strong><span>Tus mejores marcas se guardan únicamente en este navegador.</span></article>
+        <article><strong>Tablero global</strong><span>Tu mejor marca por nivel se comparte con jugadores de otros dispositivos.</span></article>
         <article><strong>Código abierto</strong><span>HTML5 Canvas, CSS y JavaScript sin librerías pesadas.</span></article>
       </section>
 
@@ -168,9 +190,9 @@
         </div>
         <ol>
           <li><strong>Escribe la palabra iluminada.</strong><span>Cada letra correcta activa un ataque ligero.</span></li>
-          <li><strong>Presiona espacio al terminar.</strong><span>Una palabra limpia lanza un golpe especial y aumenta el combo.</span></li>
+          <li><strong>Presiona espacio o Enter al terminar.</strong><span>También puedes usar borrar para corregir antes de confirmar.</span></li>
           <li><strong>Cuida la precisión.</strong><span>El rival solo ataca si cometes un error o tardas demasiado en una palabra.</span></li>
-          <li><strong>Supera las cinco secciones.</strong><span>Cada partida elige frases diferentes de un banco de 50 por nivel.</span></li>
+          <li><strong>Supera las cinco secciones.</strong><span>Hay ocho niveles y cada uno alterna 50 frases diferentes.</span></li>
         </ol>
         <p class="tip">Consejo: mira la palabra, no tus manos. Las marcas de F y J te ayudan a volver a la posición inicial.</p>
       </form>

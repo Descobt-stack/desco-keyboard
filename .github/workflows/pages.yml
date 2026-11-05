@@ -28,7 +28,7 @@ jobs:
       - name: Preparar el sitio
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: ./public
       - name: Publicar
         id: deployment
         uses: actions/deploy-pages@v4

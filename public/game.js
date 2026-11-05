@@ -10,6 +10,19 @@
   const MAX_FRAME_DELTA = 40;
   const MAX_PARTICLES = 96;
   const MAX_FLOATING_TEXT = 12;
+  const API_BASE = location.hostname.endsWith('github.io')
+    ? 'https://desco-keyboard.josuepmvf.chatgpt.site'
+    : '';
+  const LETTER_ATTACKS = [
+    { type: 'jab', duration: 180, impactAt: .38, y: 365, amount: 4 },
+    { type: 'cross', duration: 190, impactAt: .42, y: 350, amount: 5 },
+    { type: 'hook', duration: 205, impactAt: .48, y: 338, amount: 6 },
+    { type: 'uppercut', duration: 220, impactAt: .52, y: 318, amount: 7 },
+    { type: 'knee', duration: 215, impactAt: .50, y: 410, amount: 7 }
+  ];
+  const PLAYER_ATTACK_TYPES = new Set([
+    'jab', 'cross', 'hook', 'uppercut', 'knee', 'heavy', 'kick'
+  ]);
   const backgroundCanvas = document.createElement('canvas');
   backgroundCanvas.width = canvas.width;
   backgroundCanvas.height = canvas.height;
@@ -34,7 +47,8 @@
 
   const state = {
     mode: 'menu',
-    level: 'novato',
+    level: 'nivel1',
+    playerName: localStorage.getItem('desco-keyboard-player-name') || '',
     lessons: [],
     wordIndex: 0,
     typed: '',
@@ -44,6 +58,9 @@
     enemyMaxHp: 100,
     combo: 0,
     bestCombo: 0,
+    cleanPhrases: 0,
+    healProgress: 0,
+    phraseHadError: false,
     correctKeys: 0,
     wrongKeys: 0,
     startAt: 0,
@@ -61,13 +78,15 @@
     shake: 0,
     flash: 0,
     playerAction: null,
+    playerActionQueue: [],
     enemyAction: null,
     particles: particlePool,
     floatingText: floatingTextPool,
     particleCursor: 0,
     floatingTextCursor: 0,
     audio: null,
-    sceneTime: 0
+    sceneTime: 0,
+    scoreSubmitted: false
   };
 
   function currentLevel() { return LEVELS[state.level]; }
@@ -76,10 +95,7 @@
   function sentenceWords() { return currentLesson()?.words || []; }
   function currentWord() { return sentenceWords()[state.wordIndex] || ''; }
   function currentTypingWord() {
-    const word = state.level === 'novato'
-      ? currentWord().replace(/[.,;:!?¿¡"()]/gu, '')
-      : currentWord();
-    return word.toLocaleLowerCase('es');
+    return currentWord().toLocaleLowerCase('es');
   }
 
   function initAudio() {
@@ -116,6 +132,15 @@
   }
 
   function beginGame() {
+    const requestedName = $('playerName').value.trim().replace(/\s+/g, ' ');
+    if (!/^[\p{L}\p{N} _.-]{2,20}$/u.test(requestedName)) {
+      $('nameError').textContent = 'Escribe un nombre de 2 a 20 caracteres.';
+      $('playerName').focus();
+      return;
+    }
+    state.playerName = requestedName;
+    localStorage.setItem('desco-keyboard-player-name', requestedName);
+    $('nameError').textContent = '';
     initAudio();
     state.mode = 'playing';
     state.lessons = currentLevel().sections.map((section, sectionIndex) => {
@@ -128,6 +153,9 @@
     state.playerHp = 100;
     state.combo = 0;
     state.bestCombo = 0;
+    state.cleanPhrases = 0;
+    state.healProgress = 0;
+    state.phraseHadError = false;
     state.correctKeys = 0;
     state.wrongKeys = 0;
     state.startAt = performance.now();
@@ -138,8 +166,10 @@
     state.floatingTextCursor = 0;
     state.effectAccumulator = 0;
     state.playerAction = null;
+    state.playerActionQueue.length = 0;
     state.enemyAction = null;
     state.pendingWaveAdvanceAt = 0;
+    state.scoreSubmitted = false;
     document.body.classList.add('game-active');
     window.scrollTo(0, 0);
     loadEnemy();
@@ -147,6 +177,7 @@
     $('startPanel').classList.add('hidden');
     $('pausePanel').classList.add('hidden');
     $('resultPanel').classList.add('hidden');
+    $('scoreSubmitStatus').textContent = '';
     $('hud').setAttribute('aria-hidden', 'false');
     $('typingInput').disabled = false;
     $('typingInput').placeholder = 'Escribe…';
@@ -213,6 +244,7 @@
     $('sentenceLine').append(ready, prompt);
     $('lessonProgress').style.width = '0%';
     $('pauseGameButton').textContent = 'Pausa';
+    loadLeaderboard();
   }
 
   function elapsedMinutes() {
@@ -264,14 +296,32 @@
     item.life = 1;
   }
 
-  function lightAttack() {
-    const now = performance.now();
-    if (state.playerAction && ['jab', 'heavy', 'kick'].includes(state.playerAction.type)
-      && actionProgress(state.playerAction, now) < .8) return;
-    state.playerAction = { type: 'jab', started: now, duration: 340, alternate: state.correctKeys % 2,
-      impactAt: .38, impact: { x: ENEMY_X, y: 365, color: '#f7f7f2', amount: 4 } };
-    state.enemyAction = { type: 'hit', started: now, duration: 370 };
-    tone(190 + (state.correctKeys % 5) * 18, .025, 'square', .012);
+  function startNextPlayerAction(now = performance.now()) {
+    if (state.playerAction || !state.playerActionQueue.length) return;
+    const next = state.playerActionQueue.shift();
+    const backlog = state.playerActionQueue.length;
+    const minimum = next.finisher ? 360 : 125;
+    next.duration = Math.max(minimum, next.duration - Math.min(backlog, 7) * 10);
+    next.started = now;
+    state.playerAction = next;
+  }
+
+  function queuePlayerAction(action, now = performance.now()) {
+    state.playerActionQueue.push(action);
+    startNextPlayerAction(now);
+  }
+
+  function lightAttack(keyNumber = state.correctKeys) {
+    const attack = LETTER_ATTACKS[(keyNumber - 1) % LETTER_ATTACKS.length];
+    queuePlayerAction({
+      type: attack.type,
+      duration: attack.duration,
+      alternate: keyNumber % 2,
+      impactAt: attack.impactAt,
+      reaction: 'hit',
+      impact: { x: ENEMY_X, y: attack.y, color: '#f7f7f2', amount: attack.amount }
+    });
+    tone(190 + (keyNumber % 5) * 18, .025, 'square', .012);
   }
 
   function completeWord() {
@@ -284,13 +334,18 @@
     state.combo += 1;
     state.bestCombo = Math.max(state.bestCombo, state.combo);
     state.enemyHp = Math.max(0, state.enemyHp - damage);
-    state.playerAction = {
-      type: state.combo % 4 === 0 ? 'kick' : 'heavy', started: now, duration: 620,
-      impact: { x: ENEMY_X, y: state.combo % 4 === 0 ? 445 : 360,
-        color: state.combo % 4 === 0 ? '#d8b45a' : '#f7f7f2', amount: 12,
+    const finisherType = state.combo % 4 === 0 ? 'kick' : 'heavy';
+    queuePlayerAction({
+      type: finisherType,
+      duration: 620,
+      finisher: true,
+      impactAt: .47,
+      reaction: sentenceComplete ? 'defeated' : 'hit',
+      sentenceComplete,
+      impact: { x: ENEMY_X, y: finisherType === 'kick' ? 445 : 360,
+        color: finisherType === 'kick' ? '#d8b45a' : '#f7f7f2', amount: 12,
         label: `+${Math.round(damage)}`, labelX: 832, labelY: 332, labelColor: '#ffd35a' }
-    };
-    state.enemyAction = { type: 'hit', started: now, duration: 570 };
+    }, now);
     tone(state.combo % 4 === 0 ? 95 : 130, .09, 'sawtooth', .06);
 
     if (!sentenceComplete) {
@@ -300,11 +355,15 @@
     state.typed = '';
     $('typingInput').value = '';
 
-    if (sentenceComplete) state.enemyHp = 0;
-
-    if (state.enemyHp <= 0) {
-      state.enemyAction = { type: 'defeated', started: now, duration: 900 };
-      state.pendingWaveAdvanceAt = now + 900;
+    if (sentenceComplete) {
+      state.enemyHp = 0;
+      $('typingInput').disabled = true;
+      if (!state.phraseHadError) {
+        state.cleanPhrases += 1;
+        state.healProgress += 1;
+      } else {
+        state.healProgress = 0;
+      }
     }
     updateUi();
   }
@@ -313,8 +372,10 @@
     const damage = currentLevel().typoDamage;
     state.wrongKeys += 1;
     state.combo = 0;
+    state.phraseHadError = true;
+    state.playerActionQueue.length = 0;
     state.playerHp = Math.max(0, state.playerHp - damage);
-    state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
+    state.playerAction = { type: 'hit', started: performance.now(), duration: 520, delay: .42 };
     state.enemyAction = { type: 'counter', started: performance.now(), duration: 560,
       impact: { x: PLAYER_X, y: 360, color: '#ff5368', amount: 12,
         label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
@@ -332,10 +393,12 @@
     const damage = reason === 'timeout' ? currentLevel().timeoutDamage : currentLevel().typoDamage;
     state.playerHp = Math.max(0, state.playerHp - damage);
     state.combo = 0;
+    state.phraseHadError = true;
+    state.playerActionQueue.length = 0;
     state.enemyAction = { type: 'attack', started: performance.now(), duration: 560,
       impact: { x: PLAYER_X, y: 360, color: currentEnemy().color, amount: 15,
         label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
-    state.playerAction = { type: 'hit', started: performance.now(), duration: 520 };
+    state.playerAction = { type: 'hit', started: performance.now(), duration: 520, delay: .42 };
     tone(65, .16, 'square', .06);
     if (state.playerHp <= 0) finishGame(false);
     updateUi();
@@ -353,11 +416,104 @@
     const best = Number(localStorage.getItem('desco-keyboard-best') || 0);
     if (getWpm() > best) localStorage.setItem('desco-keyboard-best', String(getWpm()));
     updateBest();
+    submitScore(won);
     tone(won ? 540 : 110, .3, won ? 'triangle' : 'sawtooth', .06);
   }
 
   function updateBest() {
     $('bestWpm').textContent = `${localStorage.getItem('desco-keyboard-best') || 0} PPM`;
+  }
+
+  function scoreFor(level, wpm, accuracy, hp) {
+    return level * 10000 + wpm * 100 + accuracy * 10 + Math.max(0, Math.round(hp));
+  }
+
+  function localLeaderboard() {
+    try { return JSON.parse(localStorage.getItem('desco-keyboard-local-board') || '[]'); }
+    catch { return []; }
+  }
+
+  function saveLocalScore(entry) {
+    const board = localLeaderboard();
+    const same = board.find((item) => item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es')
+      && item.level === entry.level);
+    if (same && same.score >= entry.score) return board;
+    const next = board.filter((item) => !(item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es')
+      && item.level === entry.level));
+    next.push(entry);
+    next.sort((a, b) => b.score - a.score);
+    localStorage.setItem('desco-keyboard-local-board', JSON.stringify(next.slice(0, 20)));
+    return next.slice(0, 20);
+  }
+
+  function renderLeaderboard(entries, localOnly = false) {
+    const list = $('leaderboardList');
+    list.replaceChildren();
+    $('leaderboardStatus').textContent = localOnly
+      ? 'Sin conexión global: se muestran las marcas guardadas en este dispositivo.'
+      : 'Tablero compartido · mejor marca de cada jugador y nivel.';
+    if (!entries.length) {
+      const empty = document.createElement('li');
+      empty.className = 'leaderboard-empty';
+      empty.textContent = 'Aún no hay puntuaciones. Sé el primero.';
+      list.append(empty);
+      return;
+    }
+    entries.slice(0, 10).forEach((entry) => {
+      const item = document.createElement('li');
+      const name = document.createElement('span');
+      const level = document.createElement('span');
+      const score = document.createElement('strong');
+      name.className = 'leaderboard-name';
+      level.className = 'leaderboard-level';
+      score.className = 'leaderboard-score';
+      name.textContent = entry.name;
+      level.textContent = `N${entry.level}`;
+      score.textContent = Number(entry.score).toLocaleString('es-MX');
+      item.append(name, level, score);
+      list.append(item);
+    });
+  }
+
+  async function loadLeaderboard() {
+    $('leaderboardStatus').textContent = 'Actualizando tablero global…';
+    try {
+      const response = await fetch(`${API_BASE}/api/leaderboard`, { headers: { accept: 'application/json' } });
+      if (!response.ok) throw new Error('Tablero no disponible');
+      const data = await response.json();
+      renderLeaderboard(Array.isArray(data) ? data : data.entries || []);
+    } catch {
+      renderLeaderboard(localLeaderboard(), true);
+    }
+  }
+
+  async function submitScore(won) {
+    if (state.scoreSubmitted) return;
+    state.scoreSubmitted = true;
+    const level = currentLevel().number;
+    const entry = {
+      name: state.playerName,
+      level,
+      wpm: getWpm(),
+      accuracy: getAccuracy(),
+      hp: Math.round(state.playerHp)
+    };
+    entry.score = scoreFor(entry.level, entry.wpm, entry.accuracy, entry.hp);
+    saveLocalScore(entry);
+    $('scoreSubmitStatus').textContent = `Puntuación: ${entry.score.toLocaleString('es-MX')} · guardando en el tablero global…`;
+    try {
+      const response = await fetch(`${API_BASE}/api/scores`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify(entry)
+      });
+      if (!response.ok) throw new Error('No se pudo guardar');
+      const result = await response.json();
+      $('scoreSubmitStatus').textContent = `${won ? 'Combate completado' : 'Intento registrado'} · ${result.saved ? 'nueva marca global' : 'conservamos tu mejor marca'}.`;
+      await loadLeaderboard();
+    } catch {
+      $('scoreSubmitStatus').textContent = 'La marca quedó guardada en este dispositivo; el tablero global no respondió.';
+    }
   }
 
   function renderSentence() {
@@ -389,7 +545,7 @@
     renderSentence();
     $('sentenceCount').textContent = `RONDA ${state.wave + 1}/${state.lessons.length}`;
     $('lessonLabel').textContent = `${currentLevel().label} · ${currentLesson().section}`;
-    $('streakLabel').textContent = `RACHA PERFECTA ${state.combo}`;
+    $('streakLabel').textContent = `RECUPERACIÓN ${state.healProgress}/${currentLevel().healEvery} · RACHA ${state.combo}`;
     const phraseProgress = (state.wordIndex + (state.typed.length / Math.max(word.length, 1))) / Math.max(words.length, 1);
     $('lessonProgress').style.width = `${phraseProgress * 100}%`;
     $('playerHealth').style.width = `${state.playerHp}%`;
@@ -413,7 +569,7 @@
     const comparableInput = input.toLocaleLowerCase('es');
 
     if (input.endsWith(' ')) {
-      if (input.trim().toLocaleLowerCase('es') === target && state.typed === target) completeWord();
+      if (input.slice(0, -1).toLocaleLowerCase('es') === target && state.typed === target) completeWord();
       else {
         typo();
         event.target.value = state.typed;
@@ -425,7 +581,7 @@
       const added = Math.max(0, comparableInput.length - state.typed.length);
       state.correctKeys += added;
       state.typed = comparableInput;
-      if (added) lightAttack();
+      for (let i = 0; i < added; i += 1) lightAttack(state.correctKeys - added + i + 1);
       updateUi();
     } else {
       typo();
@@ -525,19 +681,27 @@
       : 1 - smooth((p - peak) / (end - peak));
     const idle = Math.sin(state.sceneTime * .005 + (isEnemy ? 1.5 : 0));
     const step = Math.sin(state.sceneTime * .003 + (isEnemy ? 2 : 0));
-    const striking = ['jab', 'heavy', 'kick', 'attack', 'counter'].includes(type);
+    const striking = PLAYER_ATTACK_TYPES.has(type) || ['attack', 'counter'].includes(type);
     const isKick = type === 'kick';
-    const strike = striking ? windowed(0, type === 'jab' ? .38 : .47, .84) : 0;
-    const dash = striking ? windowed(.05, type === 'jab' ? .38 : .47, .94) : 0;
-    const recoil = type === 'hit' ? windowed(.48, .68, 1) : 0;
-    const fall = type === 'defeated' ? smooth((p - .36) / .54) : 0;
+    const isKnee = type === 'knee';
+    const peaks = { jab: .38, cross: .42, hook: .48, uppercut: .52, knee: .50, heavy: .47, kick: .47, attack: .46, counter: .46 };
+    const peak = peaks[type] ?? .47;
+    const strike = striking ? windowed(0, peak, .86) : 0;
+    const dash = striking ? windowed(.05, peak, .94) : 0;
+    const reactionDelay = action?.delay ?? 0;
+    const recoil = type === 'hit' ? windowed(reactionDelay, Math.min(reactionDelay + .22, .76), 1) : 0;
+    const fall = type === 'defeated' ? smooth((p - .08) / .72) : 0;
     const spawn = type === 'spawn' ? 1 - easeOut(p) : 0;
-    const reach = type === 'jab' ? 41 : isKick ? 40 : 92;
-    // Cada golpe llega al torso rival antes de que empiece la reacción.
-    const travel = type === 'jab' ? 350 : isKick ? 305 : 295;
+    const reach = type === 'jab' ? 50 : type === 'heavy' ? 95 : isKick ? 42 : 62;
+    const travelByType = {
+      jab: 370, cross: 370, hook: 360, uppercut: 360, knee: 350,
+      heavy: 335, kick: 330, attack: 335, counter: 335
+    };
+    // El desplazamiento y el brazo o pierna terminan en el cuerpo rival.
+    const travel = travelByType[type] ?? 0;
     const offsetX = facing * (dash * travel - recoil * 52 - fall * 72);
-    const offsetY = -spawn * 120 - (isKick ? Math.sin(p * Math.PI) * 13 : 0) + recoil * 10 + fall * 76 + idle * (striking ? .4 : 1.8);
-    const lean = strike * (isKick ? -.18 : .17) - recoil * .42 - fall * 1.15 + idle * .018;
+    const offsetY = -spawn * 120 - ((isKick || isKnee) ? Math.sin(p * Math.PI) * 13 : 0) + recoil * 10 + fall * 76 + idle * (striking ? .4 : 1.8);
+    const lean = strike * ((isKick || isKnee) ? -.18 : .17) - recoil * .42 - fall * 1.15 + idle * .018;
     const crouch = striking ? windowed(0, .19, .43) * 13 : 0;
 
     ctx.save();
@@ -555,11 +719,32 @@
     const hip = { x: -crouch * .3, y: -92 + crouch };
     const chest = { x: 2 + strike * 8, y: -165 + crouch * .55 };
     const head = { x: 2 + strike * 7, y: -210 + crouch * .4 };
-    const frontFoot = { x: 43 + (isKick ? strike * 116 : 0) + step * 3, y: -4 - (isKick ? strike * 67 : 0) };
+    const frontFoot = {
+      x: 43 + (isKick ? strike * 116 : 0) + (isKnee ? strike * 70 : 0) + step * 3,
+      y: -4 - (isKick ? strike * 67 : 0) - (isKnee ? strike * 82 : 0)
+    };
     const backFoot = { x: -43 - dash * 16 - step * 3, y: -4 };
     const alternating = type === 'jab' && action.alternate;
-    const frontHand = { x: 46 + (alternating ? strike * 8 : strike * reach) + idle * 4, y: -146 - strike * 10 + idle * 4 };
-    const backHand = { x: -29 + (alternating ? strike * 112 : strike * 18), y: -142 - (alternating ? strike * 14 : 0) - idle * 4 };
+    let frontElbow = { x: 28 + strike * reach * .42, y: -159 + crouch * .3 };
+    let backElbow = { x: -22 + (alternating ? strike * 23 : 0), y: -151 + crouch * .3 };
+    let frontHand = { x: 46 + (alternating ? strike * 8 : strike * reach) + idle * 4, y: -146 - strike * 10 + idle * 4 };
+    let backHand = { x: -29 + (alternating ? strike * 112 : strike * 18), y: -142 - (alternating ? strike * 14 : 0) - idle * 4 };
+
+    if (type === 'cross') {
+      frontElbow = { x: 12, y: -146 };
+      frontHand = { x: 30, y: -132 };
+      backElbow = { x: 24 + strike * 42, y: -160 };
+      backHand = { x: -18 + strike * 142, y: -156 };
+    } else if (type === 'hook') {
+      frontElbow = { x: 33 + strike * 42, y: -176 };
+      frontHand = { x: 48 + strike * 80, y: -150 + strike * 24 };
+    } else if (type === 'uppercut') {
+      frontElbow = { x: 34 + strike * 34, y: -138 - strike * 34 };
+      frontHand = { x: 44 + strike * 72, y: -130 - strike * 92 };
+    } else if (isKnee) {
+      frontElbow = { x: 36, y: -164 };
+      frontHand = { x: 58, y: -150 };
+    }
 
     const drawLimb = (...points) => {
       ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
@@ -569,14 +754,30 @@
     };
 
     drawLimb(hip, { x: -20 - dash * 7, y: -49 + crouch * .6 }, backFoot);
-    drawLimb(hip, { x: 26 + (isKick ? strike * 36 : 0), y: -50 - (isKick ? strike * 41 : 0) }, frontFoot);
+    drawLimb(hip, {
+      x: 26 + (isKick ? strike * 36 : 0) + (isKnee ? strike * 58 : 0),
+      y: -50 - (isKick ? strike * 41 : 0) - (isKnee ? strike * 68 : 0)
+    }, frontFoot);
     drawLimb(hip, chest);
-    drawLimb(chest, { x: -22 + (alternating ? strike * 23 : 0), y: -151 + crouch * .3 }, backHand);
-    drawLimb(chest, { x: 28 + strike * reach * .42, y: -159 + crouch * .3 }, frontHand);
+    drawLimb(chest, backElbow, backHand);
+    drawLimb(chest, frontElbow, frontHand);
     if (striking && !isKick && strike > .2) {
-      const fist = alternating ? backHand : frontHand;
+      const fist = type === 'cross' || alternating ? backHand : frontHand;
       ctx.beginPath(); ctx.arc(fist.x, fist.y, 5, 0, Math.PI * 2);
       ctx.fillStyle = color; ctx.fill();
+    }
+
+    if (striking && strike > .45) {
+      const endpoint = isKick || isKnee ? frontFoot : (type === 'cross' ? backHand : frontHand);
+      ctx.save();
+      ctx.globalAlpha = Math.min(.2, strike * .2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(endpoint.x - 34, endpoint.y + 3);
+      ctx.lineTo(endpoint.x - 8, endpoint.y);
+      ctx.stroke();
+      ctx.restore();
     }
 
     ctx.fillStyle = color;
@@ -643,10 +844,29 @@
       const hit = action.impact;
       createImpact(hit.x, hit.y, hit.color, hit.amount);
       if (hit.label) addFloat(hit.label, hit.labelX, hit.labelY, hit.labelColor);
-      state.shake = action.type === 'jab' ? 1.6 : action.type === 'kick' ? 12 : 8;
-      state.flash = action.type === 'jab' ? .04 : .32;
+      const lightStrike = LETTER_ATTACKS.some((attack) => attack.type === action.type);
+      state.shake = lightStrike ? 2.2 : action.type === 'kick' ? 12 : 8;
+      state.flash = lightStrike ? .055 : .32;
       action.impactDone = true;
-      if (state.enemyHp <= 0 && action === state.playerAction) addFloat('¡RIVAL VENCIDO!', 640, 250, '#ffd35a');
+      if (action === state.playerAction) {
+        state.enemyAction = {
+          type: action.reaction || 'hit',
+          started: now,
+          duration: action.sentenceComplete ? 900 : 360,
+          delay: action.sentenceComplete ? .08 : 0
+        };
+        if (action.sentenceComplete) {
+          addFloat('¡FRASE COMPLETA!', 640, 250, '#ffd35a');
+          if (state.healProgress >= currentLevel().healEvery) {
+            const before = state.playerHp;
+            state.playerHp = Math.min(100, state.playerHp + currentLevel().healAmount);
+            const healed = Math.round(state.playerHp - before);
+            state.healProgress = 0;
+            if (healed > 0) addFloat(`+${healed} VIDA`, PLAYER_X, 315, '#78c6c2');
+          }
+          state.pendingWaveAdvanceAt = now + 900;
+        }
+      }
     }
     if (now >= state.wordDeadline && state.enemyHp > 0) {
       enemyAttack('timeout');
@@ -659,13 +879,19 @@
         state.wave += 1;
         state.wordIndex = 0;
         state.typed = '';
-        state.playerHp = Math.min(100, state.playerHp + 15);
+        state.phraseHadError = false;
         loadEnemy();
         resetWordDeadline(now);
+        $('typingInput').disabled = false;
+        $('typingInput').value = '';
+        $('typingInput').focus({ preventScroll: true });
         updateUi();
       }
     }
-    if (state.playerAction && actionProgress(state.playerAction, now) >= 1) state.playerAction = null;
+    if (state.playerAction && actionProgress(state.playerAction, now) >= 1) {
+      state.playerAction = null;
+      startNextPlayerAction(now);
+    }
     if (state.enemyAction && actionProgress(state.enemyAction, now) >= 1 && state.enemyAction.type !== 'defeated') state.enemyAction = null;
     if (now - state.lastHudUpdate >= 250) {
       state.lastHudUpdate = now;
@@ -709,7 +935,7 @@
     ctx.save();
     if (state.shake > .2) ctx.translate((Math.random() - .5) * state.shake, (Math.random() - .5) * state.shake);
     drawBackground(now);
-    const playerAttacking = ['jab', 'heavy', 'kick'].includes(state.playerAction?.type);
+    const playerAttacking = PLAYER_ATTACK_TYPES.has(state.playerAction?.type);
     if (playerAttacking) drawStickman(ENEMY_X, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
     drawStickman(PLAYER_X, 535, 1.08, '#f7f7f2', 1, state.playerAction, now, false);
     if (!playerAttacking) drawStickman(ENEMY_X, 535, 1.08, currentEnemy().color, -1, state.enemyAction, now, true);
@@ -722,11 +948,20 @@
     requestAnimationFrame(render);
   }
 
+  function updateLevelRules() {
+    const level = currentLevel();
+    const writing = level.punctuation
+      ? 'incluye acentos, comas, puntos y otros signos'
+      : level.accents ? 'incluye palabras con acentos' : 'usa frases sin acentos ni signos';
+    $('levelRules').textContent = `Nivel ${level.number}: ${writing}. Recuperas ${level.healAmount} de vida cada ${level.healEvery} ${level.healEvery === 1 ? 'frase limpia' : 'frases limpias'}. Puedes usar borrar, espacio y Enter.`;
+  }
+
   document.querySelectorAll('.difficulty').forEach((button) => {
     button.addEventListener('click', () => {
       document.querySelectorAll('.difficulty').forEach((item) => item.classList.remove('active'));
       button.classList.add('active');
       state.level = button.dataset.level;
+      updateLevelRules();
       tone(260, .05, 'triangle', .025);
     });
   });
@@ -742,6 +977,12 @@
     else if (state.mode === 'paused') resumeGame();
   });
   $('typingInput').addEventListener('input', handleInput);
+  $('typingInput').addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter' || state.mode !== 'playing') return;
+    event.preventDefault();
+    if (state.typed === currentTypingWord()) completeWord();
+    else typo();
+  });
   $('typingInput').addEventListener('paste', (event) => event.preventDefault());
   $('arenaWrap').addEventListener('click', () => {
     if (state.mode === 'playing') $('typingInput').focus({ preventScroll: true });
@@ -791,6 +1032,7 @@
   $('themeToggleButton').addEventListener('click', toggleTheme);
   $('fullscreenButton').addEventListener('click', toggleFullscreen);
   $('settingsFullscreenButton').addEventListener('click', toggleFullscreen);
+  $('refreshLeaderboard').addEventListener('click', loadLeaderboard);
 
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && state.mode === 'playing') {
@@ -808,6 +1050,9 @@
   updateSoundLabels();
   applyTheme();
   updateBest();
+  $('playerName').value = state.playerName;
+  updateLevelRules();
+  loadLeaderboard();
   buildBackgroundCache();
   requestAnimationFrame(render);
 })();
