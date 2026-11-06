@@ -16,7 +16,8 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - Rival con movimiento autónomo y defensa automática mientras aún queda tiempo para escribir.
 - Golpe fuerte o patada al terminar una palabra.
 - Tablero global con nombre, nivel y mejor puntuación por jugador.
-- Puntuación independiente por nivel: las partidas completas conservan el 100% y las incompletas solo el 10%, sin cifras gigantes.
+- Puntuación independiente por nivel: el nivel 1 llega a 650 puntos y los siguientes a 725, 800, 875, 950, 1025, 1100 y 1175; las bandas no se solapan.
+- La marca combina velocidad, precisión, letras correctas, combo y vida. Una campaña completa conserva el resultado de su banda; una incompleta solo el 10% de lo obtenido hasta su avance.
 - Pausa manual y automática al cambiar de pestaña.
 - Tema oscuro y claro, sonido Web Audio, PPM, precisión, rango, combo y salud.
 - Interfaz ajustada para laptop; el trabajo específico para móviles queda fuera de esta fase.

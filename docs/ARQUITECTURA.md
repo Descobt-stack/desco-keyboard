@@ -41,7 +41,9 @@ La frase usa un contenedor flexible con salto de línea. Cada palabra es una uni
 
 ## Tablero global
 
-El navegador envía nombre, nivel, PPM, precisión, vida restante, teclas correctas e incorrectas, duración y fases terminadas. El Worker vuelve a calcular PPM y precisión a partir de esas métricas, exige que coincidan con la marca declarada, comprueba si la cantidad de fases corresponde al nivel y guarda solo la mejor marca independiente de cada jugador y nivel. La fórmula no acumula niveles y una partida incompleta vale el 10% de su resultado. La nueva temporada deja fuera las marcas anteriores sin permitir que bloqueen una nueva marca. Si el servicio no responde, conservo una tabla local temporal que también se reinicia por versión.
+El navegador envía nombre, nivel, PPM, precisión, vida restante, teclas correctas e incorrectas, duración, combo, avance y fases terminadas. El Worker vuelve a calcular PPM, precisión y puntuación a partir de esas métricas, exige que coincidan con la marca declarada, comprueba si la cantidad de fases corresponde al nivel y guarda solo la mejor marca independiente de cada jugador y nivel. El tablero se consulta con el nivel elegido, así que una pantalla de nivel 1 no mezcla resultados de nivel 4.
+
+La puntuación usa bandas sin solapamiento: el nivel 1 llega a 650 y cada nivel siguiente tiene un límite mayor y comienza después del límite anterior. Dentro de la banda, peso velocidad, precisión, letras correctas, combo y vida. Una campaña completa conserva el 100% de ese resultado; una incompleta conserva el 10% de lo obtenido hasta el avance alcanzado. La nueva temporada deja fuera las marcas anteriores sin permitir que bloqueen una nueva marca. Si el servicio no responde, conservo una tabla local temporal que también se reinicia por versión.
 
 La tabla no usa contraseñas ni publica correos. El Worker además limita el origen, el tamaño del JSON y los envíos repetidos a 10 por minuto por cliente. Esta validación eleva la barrera contra puntuaciones falsas; una futura fase podría añadir identidad y una sesión firmada para una verificación todavía más fuerte.
 

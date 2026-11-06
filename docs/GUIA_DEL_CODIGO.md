@@ -1,6 +1,6 @@
 # Cómo construí Desco Keyboard
 
-Esta es mi guía corta para recordar qué hace cada parte del proyecto y dónde debo cambiarla.
+Esta es mi explicación breve de cómo construí cada parte del proyecto y dónde la puedo cambiar.
 
 ## Archivos principales
 
@@ -62,22 +62,22 @@ El enemigo también tiene un pequeño pensamiento autónomo: `enemyNextThinkAt` 
 
 ## Cómo calculo la puntuación
 
-Cada nivel tiene su propia marca; no sumo el número de nivel ni arrastro puntos de una ronda a otra. Uso PPM, precisión y vida restante:
+Yo separé la puntuación por nivel para que el tablero solo compare a quienes jugaron la misma dificultad. Cada nivel tiene un límite corto y creciente: el nivel 1 llega a 650 puntos y los siguientes llegan a 725, 800, 875, 950, 1025, 1100 y 1175.
 
-```js
-ppmLimitado * 10 + precision * 2 + vida * 2
-```
+La marca combina cinco señales: 25% de velocidad (PPM), 25% de precisión, 20% de letras correctas, 15% del mejor combo y 15% de vida restante. Cada señal se compara con la meta propia del nivel y queda limitada al 100%, así que escribir más rápido no genera cifras gigantes.
 
-Limito las PPM a 200 para que la cifra siga siendo corta. Si completo el nivel guardo el resultado completo; si abandono o pierdo, guardo únicamente el 10%. El Worker repite este cálculo y no confía en el número enviado por el navegador.
+Para que una campaña completada de mayor dificultad siempre tenga más valor que una campaña inferior, cada nivel ocupa una banda sin solaparse. El nivel 1 ocupa de 0 a 650; el nivel 2 empieza en 651; el nivel 3 en 726, y así sucesivamente. Dentro de su banda, la calificación depende de mis métricas: D, C, B, A, S o SS. Una marca perfecta alcanza el límite de su nivel.
+
+Si completo todas las fases guardo el resultado de esa banda. Si pierdo o abandono, calculo lo que llevaba según el avance de la fase y conservo solo el 10%. El navegador y el Worker repiten la misma fórmula; el servidor no confía en la puntuación enviada por el navegador.
 
 ## `worker/handler.js`
 
 Aquí serví el juego y creé dos rutas:
 
-- `GET /api/leaderboard`: devuelve las 50 mejores marcas.
+- `GET /api/leaderboard?level=3`: devuelve las 50 mejores marcas del nivel solicitado. Si no indico nivel, mantiene la consulta general para compatibilidad.
 - `POST /api/scores`: valida los datos y guarda una marca si supera la anterior.
 
-Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. La temporada nueva ignora las marcas anteriores para que el tablero empiece limpio.
+Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. La combinación de jugador y nivel es independiente: una marca del nivel 1 no ocupa el lugar de una marca del nivel 4. La temporada nueva ignora las marcas anteriores para que el tablero empiece limpio.
 
 También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 10 envíos por minuto y vuelvo a calcular PPM, precisión y fases terminadas a partir de las métricas enviadas. Añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria y la validación cruzada son barreras adicionales; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
 

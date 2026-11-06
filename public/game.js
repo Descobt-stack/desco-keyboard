@@ -10,9 +10,19 @@
   const MAX_FRAME_DELTA = 40;
   const MAX_PARTICLES = 96;
   const MAX_FLOATING_TEXT = 12;
-  const SCOREBOARD_VERSION = '2026-11-score-v2';
+  const SCOREBOARD_VERSION = '2026-11-score-v3';
   const TRAINER_STORAGE_KEY = 'desco-keyboard-letter-misses-v1';
   const PHRASE_HISTORY_PREFIX = 'desco-keyboard-phrase-history-v1-';
+  const SCORE_PROFILES = [
+    { cap: 650, targetWpm: 20, letterTarget: 400, comboTarget: 50 },
+    { cap: 725, targetWpm: 25, letterTarget: 440, comboTarget: 50 },
+    { cap: 800, targetWpm: 30, letterTarget: 480, comboTarget: 55 },
+    { cap: 875, targetWpm: 36, letterTarget: 520, comboTarget: 60 },
+    { cap: 950, targetWpm: 45, letterTarget: 780, comboTarget: 90 },
+    { cap: 1025, targetWpm: 55, letterTarget: 840, comboTarget: 95 },
+    { cap: 1100, targetWpm: 65, letterTarget: 840, comboTarget: 100 },
+    { cap: 1175, targetWpm: 78, letterTarget: 1100, comboTarget: 120 }
+  ];
   const API_BASE = location.hostname.endsWith('github.io')
     ? 'https://desco-keyboard.josuepmvf.chatgpt.site'
     : '';
@@ -484,13 +494,17 @@
     const total = state.correctKeys + state.wrongKeys;
     return total ? Math.round((state.correctKeys / total) * 100) : 100;
   }
+  function currentProgressPercent() {
+    if (!state.lessons.length) return 0;
+    const words = sentenceWords();
+    const wordProgress = words.length
+      ? Math.min(1, (state.wordIndex + (state.typed.length / Math.max(currentWord().length, 1))) / words.length)
+      : 0;
+    return Math.max(0, Math.min(99, Math.floor(((state.wave + wordProgress) / state.lessons.length) * 100)));
+  }
+
   function getRank() {
-    if (state.combo >= 18) return 'SS';
-    if (state.combo >= 12) return 'S';
-    if (state.combo >= 8) return 'A';
-    if (state.combo >= 5) return 'B';
-    if (state.combo >= 2) return 'C';
-    return 'D';
+    return scoreGrade(getScore(), currentLevel().number);
   }
 
   function createImpact(x, y, color, amount = 12) {
@@ -654,12 +668,15 @@
 
   function finishGame(won) {
     state.mode = won ? 'won' : 'lost';
+    const finalScore = getScore(won);
     $('typingInput').disabled = true;
     $('resultPanel').classList.remove('hidden');
     $('resultEyebrow').textContent = won ? 'ENTRENAMIENTO COMPLETADO' : 'FIN DEL COMBATE';
     $('resultTitle').textContent = won ? '¡Dominaste la arena!' : 'Vuelve a intentarlo';
     $('resultWpm').textContent = getWpm();
     $('resultAccuracy').textContent = getAccuracy();
+    $('resultScore').textContent = finalScore.toLocaleString('es-MX');
+    $('resultGrade').textContent = scoreGrade(finalScore, currentLevel().number);
     $('resultCombo').textContent = state.bestCombo;
     const best = Number(localStorage.getItem('desco-keyboard-best') || 0);
     if (getWpm() > best) localStorage.setItem('desco-keyboard-best', String(getWpm()));
@@ -672,10 +689,49 @@
     $('bestWpm').textContent = `${localStorage.getItem('desco-keyboard-best') || 0} PPM`;
   }
 
-  function scoreFor(wpm, accuracy, hp, completed) {
+  function scoreProfile(levelNumber) {
+    return SCORE_PROFILES[Math.min(SCORE_PROFILES.length, Math.max(1, Math.round(levelNumber))) - 1];
+  }
+
+  function scoreBandStart(levelNumber) {
+    const level = Math.min(SCORE_PROFILES.length, Math.max(1, Math.round(levelNumber)));
+    return level === 1 ? 0 : scoreProfile(level - 1).cap + 1;
+  }
+
+  function scoreRatio(value, target) {
+    return Math.max(0, Math.min(1, Number(value) / Math.max(1, target)));
+  }
+
+  function scoreFor(levelNumber, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed) {
+    const profile = scoreProfile(levelNumber);
     const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
-    const raw = Math.round(cappedWpm * 10 + accuracy * 2 + Math.max(0, Math.round(hp)) * 2);
-    return completed ? raw : Math.round(raw * .1);
+    const progress = completed ? 1 : scoreRatio(progressPercent, 100);
+    const weighted = scoreRatio(cappedWpm, profile.targetWpm) * .25
+      + scoreRatio(accuracy, 100) * .25
+      + scoreRatio(correctKeys, profile.letterTarget) * .20
+      + scoreRatio(bestCombo, profile.comboTarget) * .15
+      + scoreRatio(hp, 100) * .15;
+    if (!completed) return Math.round(profile.cap * weighted * progress * .1);
+    const bandStart = scoreBandStart(levelNumber);
+    const bandWidth = Math.max(1, profile.cap - bandStart);
+    return bandStart + Math.round(bandWidth * weighted);
+  }
+
+  function scoreGrade(score, levelNumber) {
+    const profile = scoreProfile(levelNumber);
+    const bandStart = scoreBandStart(levelNumber);
+    const performance = scoreRatio(Number(score) - bandStart, profile.cap - bandStart);
+    if (performance >= .9) return 'SS';
+    if (performance >= .78) return 'S';
+    if (performance >= .65) return 'A';
+    if (performance >= .52) return 'B';
+    if (performance >= .38) return 'C';
+    return 'D';
+  }
+
+  function getScore(completed = state.mode === 'won') {
+    return scoreFor(currentLevel().number, getWpm(), getAccuracy(), state.playerHp,
+      state.bestCombo, state.correctKeys, currentProgressPercent(), completed);
   }
 
   function localLeaderboard() {
@@ -703,28 +759,33 @@
   function renderLeaderboard(entries, localOnly = false) {
     const list = $('leaderboardList');
     list.replaceChildren();
+    const levelNumber = currentLevel().number;
+    const levelEntries = entries.filter((entry) => Number(entry.level) === levelNumber);
     $('leaderboardStatus').textContent = localOnly
-      ? 'Sin conexión global: se muestran las marcas guardadas en este dispositivo.'
-      : 'Tablero compartido · mejor marca de cada jugador y nivel.';
-    if (!entries.length) {
+      ? `Sin conexión global · nivel ${levelNumber}: se muestran las marcas guardadas en este dispositivo.`
+      : `Tablero compartido · nivel ${levelNumber} · mejor marca de cada jugador.`;
+    if (!levelEntries.length) {
       const empty = document.createElement('li');
       empty.className = 'leaderboard-empty';
-      empty.textContent = 'Aún no hay puntuaciones. Sé el primero.';
+      empty.textContent = `Aún no hay puntuaciones para el nivel ${levelNumber}. Sé el primero.`;
       list.append(empty);
       return;
     }
-    entries.slice(0, 10).forEach((entry) => {
+    levelEntries.slice(0, 10).forEach((entry) => {
       const item = document.createElement('li');
       const name = document.createElement('span');
       const level = document.createElement('span');
+      const grade = document.createElement('span');
       const score = document.createElement('strong');
       name.className = 'leaderboard-name';
       level.className = 'leaderboard-level';
+      grade.className = 'leaderboard-grade';
       score.className = 'leaderboard-score';
       name.textContent = entry.name;
       level.textContent = `N${entry.level}`;
+      grade.textContent = scoreGrade(Number(entry.score), levelNumber);
       score.textContent = Number(entry.score).toLocaleString('es-MX');
-      item.append(name, level, score);
+      item.append(name, level, grade, score);
       list.append(item);
     });
   }
@@ -732,7 +793,8 @@
   async function loadLeaderboard() {
     $('leaderboardStatus').textContent = 'Actualizando tablero global…';
     try {
-      const response = await fetch(`${API_BASE}/api/leaderboard`, { headers: { accept: 'application/json' } });
+      const levelNumber = currentLevel().number;
+      const response = await fetch(`${API_BASE}/api/leaderboard?level=${levelNumber}`, { headers: { accept: 'application/json' } });
       if (!response.ok) throw new Error('Tablero no disponible');
       const data = await response.json();
       renderLeaderboard(Array.isArray(data) ? data : data.entries || []);
@@ -755,9 +817,12 @@
       correctKeys: state.correctKeys,
       wrongKeys: state.wrongKeys,
       durationMs: elapsedMilliseconds(),
-      phasesCompleted: won ? state.lessons.length : Math.max(0, state.wave)
+      phasesCompleted: won ? state.lessons.length : Math.max(0, state.wave),
+      progressPercent: won ? 100 : currentProgressPercent(),
+      bestCombo: state.bestCombo
     };
-    entry.score = scoreFor(entry.wpm, entry.accuracy, entry.hp, entry.completed);
+    entry.score = scoreFor(entry.level, entry.wpm, entry.accuracy, entry.hp,
+      entry.bestCombo, entry.correctKeys, entry.progressPercent, entry.completed);
     saveLocalScore(entry);
     $('scoreSubmitStatus').textContent = `Puntuación: ${entry.score.toLocaleString('es-MX')} · guardando en el tablero global…`;
     try {
@@ -1255,6 +1320,7 @@
       button.classList.add('active');
       state.level = button.dataset.level;
       updateLevelRules();
+      loadLeaderboard();
       tone(260, .05, 'triangle', .025);
     });
   });

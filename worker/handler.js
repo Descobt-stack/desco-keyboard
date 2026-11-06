@@ -7,9 +7,20 @@ const SCORE_RATE_WINDOW_MS = 60_000;
 const SCORE_RATE_LIMIT = 10;
 const MAX_SCORE_DURATION_MS = 6 * 60 * 60 * 1000;
 const MAX_SCORE_KEYS = 20_000;
-// Nueva temporada: las marcas anteriores quedan fuera del tablero activo.
+const MAX_SCORE_COMBO = 2_000;
+const SCORE_PROFILES = [
+  { cap: 650, targetWpm: 20, letterTarget: 400, comboTarget: 50 },
+  { cap: 725, targetWpm: 25, letterTarget: 440, comboTarget: 50 },
+  { cap: 800, targetWpm: 30, letterTarget: 480, comboTarget: 55 },
+  { cap: 875, targetWpm: 36, letterTarget: 520, comboTarget: 60 },
+  { cap: 950, targetWpm: 45, letterTarget: 780, comboTarget: 90 },
+  { cap: 1025, targetWpm: 55, letterTarget: 840, comboTarget: 95 },
+  { cap: 1100, targetWpm: 65, letterTarget: 840, comboTarget: 100 },
+  { cap: 1175, targetWpm: 78, letterTarget: 1100, comboTarget: 120 }
+];
+// Nueva temporada de puntuación: las marcas anteriores quedan fuera del tablero activo.
 // Se conservan en D1 para no hacer una eliminación irreversible desde el Worker.
-const SCOREBOARD_RESET_AT = Date.parse('2026-11-06T16:20:54.803Z');
+const SCOREBOARD_RESET_AT = Date.parse('2026-11-06T18:17:39.555Z');
 const scoreRateBuckets = new Map();
 
 const ASSET_TYPES = {
@@ -63,10 +74,32 @@ function validInteger(value, min, max) {
   return Number.isInteger(value) && value >= min && value <= max;
 }
 
-function scoreFor(wpm, accuracy, hp, completed) {
+function scoreProfile(level) {
+  return SCORE_PROFILES[Math.min(SCORE_PROFILES.length, Math.max(1, Math.round(level))) - 1];
+}
+
+function scoreBandStart(level) {
+  const normalizedLevel = Math.min(SCORE_PROFILES.length, Math.max(1, Math.round(level)));
+  return normalizedLevel === 1 ? 0 : scoreProfile(normalizedLevel - 1).cap + 1;
+}
+
+function scoreRatio(value, target) {
+  return Math.max(0, Math.min(1, Number(value) / Math.max(1, target)));
+}
+
+function scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed) {
+  const profile = scoreProfile(level);
   const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
-  const raw = Math.round(cappedWpm * 10 + accuracy * 2 + Math.max(0, Math.round(hp)) * 2);
-  return completed ? raw : Math.round(raw * .1);
+  const progress = completed ? 1 : scoreRatio(progressPercent, 100);
+  const weighted = scoreRatio(cappedWpm, profile.targetWpm) * .25
+    + scoreRatio(accuracy, 100) * .25
+    + scoreRatio(correctKeys, profile.letterTarget) * .20
+    + scoreRatio(bestCombo, profile.comboTarget) * .15
+    + scoreRatio(hp, 100) * .15;
+  if (!completed) return Math.round(profile.cap * weighted * progress * .1);
+  const bandStart = scoreBandStart(level);
+  const bandWidth = Math.max(1, profile.cap - bandStart);
+  return bandStart + Math.round(bandWidth * weighted);
 }
 
 function phaseCountForLevel(level) {
@@ -107,13 +140,26 @@ function rateLimited(request) {
 
 async function readLeaderboard(request, env) {
   if (!env.DB) return json(request, { error: 'Base de datos no disponible.' }, 503);
-  const result = await env.DB.prepare(
-    `SELECT player_name AS name, level, score, wpm, accuracy
-     FROM scores
-     WHERE updated_at >= ?
-     ORDER BY score DESC, updated_at ASC
-     LIMIT 50`
-  ).bind(SCOREBOARD_RESET_AT).all();
+  const requestedLevel = new URL(request.url).searchParams.get('level');
+  const level = requestedLevel === null ? null : Number(requestedLevel);
+  if (requestedLevel !== null && !validInteger(level, 1, 8)) {
+    return json(request, { error: 'Nivel inválido.' }, 400);
+  }
+  const result = level
+    ? await env.DB.prepare(
+      `SELECT player_name AS name, level, score, wpm, accuracy
+       FROM scores
+       WHERE updated_at >= ? AND level = ?
+       ORDER BY score DESC, updated_at ASC
+       LIMIT 50`
+    ).bind(SCOREBOARD_RESET_AT, level).all()
+    : await env.DB.prepare(
+      `SELECT player_name AS name, level, score, wpm, accuracy
+       FROM scores
+       WHERE updated_at >= ?
+       ORDER BY score DESC, updated_at ASC
+       LIMIT 50`
+    ).bind(SCOREBOARD_RESET_AT).all();
   return json(request, result.results || []);
 }
 
@@ -146,13 +192,17 @@ async function saveScore(request, env) {
   const wrongKeys = Number(body?.wrongKeys);
   const durationMs = Number(body?.durationMs);
   const phasesCompleted = Number(body?.phasesCompleted);
+  const progressPercent = Number(body?.progressPercent);
+  const bestCombo = Number(body?.bestCombo);
   if (!validName(name) || !validInteger(level, 1, 8) || !validInteger(wpm, 0, 300)
     || !validInteger(accuracy, 0, 100) || !validInteger(hp, 0, 100)
     || typeof body?.completed !== 'boolean'
     || !validInteger(correctKeys, 0, MAX_SCORE_KEYS)
     || !validInteger(wrongKeys, 0, MAX_SCORE_KEYS)
     || !validInteger(durationMs, 1000, MAX_SCORE_DURATION_MS)
-    || !validInteger(phasesCompleted, 0, phaseCountForLevel(level))) {
+    || !validInteger(phasesCompleted, 0, phaseCountForLevel(level))
+    || !validInteger(progressPercent, 0, 100)
+    || !validInteger(bestCombo, 0, MAX_SCORE_COMBO)) {
     return json(request, { error: 'Puntuación inválida.' }, 400);
   }
 
@@ -160,12 +210,15 @@ async function saveScore(request, env) {
   const expectedAccuracy = derivedAccuracy(correctKeys, wrongKeys);
   const expectedPhases = phaseCountForLevel(level);
   if (Math.abs(wpm - expectedWpm) > 1 || accuracy !== expectedAccuracy
-    || (completed ? phasesCompleted !== expectedPhases : phasesCompleted >= expectedPhases)) {
+    || bestCombo > correctKeys
+    || progressPercent < Math.floor((phasesCompleted / expectedPhases) * 100)
+    || (completed ? (phasesCompleted !== expectedPhases || progressPercent !== 100)
+      : progressPercent >= 100)) {
     return json(request, { error: 'La marca no coincide con el entrenamiento.' }, 422);
   }
 
   const normalizedName = normalizeName(name);
-  const score = scoreFor(wpm, accuracy, hp, completed);
+  const score = scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed);
   const previous = await env.DB.prepare(
     'SELECT score FROM scores WHERE normalized_name = ? AND level = ? AND updated_at >= ?'
   ).bind(normalizedName, level, SCOREBOARD_RESET_AT).first();
