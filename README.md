@@ -4,7 +4,7 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 
 ## Lo que incluye
 
-- Ocho niveles progresivos, con 50 frases distintas por nivel y cinco secciones por partida.
+- Ocho niveles progresivos, con 50 frases distintas por nivel; cada partida elige 10 fases en los niveles 1–4 y 16 en los niveles 5–8.
 - Niveles 1 al 4 sin acentos ni puntuación; niveles 5 y 6 con acentos; niveles 7 y 8 con acentos, comas, puntos y otros signos.
 - Tiempo oculto de 6 a 2.4 segundos por palabra, según la dificultad.
 - `Backspace` para corregir y `Espacio` o `Enter` para confirmar la palabra.
@@ -19,7 +19,9 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - Puntuación independiente por nivel: las partidas completas conservan el 100% y las incompletas solo el 10%, sin cifras gigantes.
 - Pausa manual y automática al cambiar de pestaña.
 - Tema oscuro y claro, sonido Web Audio, PPM, precisión, rango, combo y salud.
-- Interfaz adaptable a laptop, tableta y teléfono.
+- Interfaz ajustada para laptop; el trabajo específico para móviles queda fuera de esta fase.
+- Entrenador inteligente local: detecta mis letras falladas y prioriza frases dirigidas en la siguiente partida sin enviar ese perfil al servidor.
+- Validación del tablero: el servidor recalcula PPM y precisión, comprueba las fases terminadas, limita envíos y conserva solo marcas válidas.
 
 ## Cómo organicé el código
 

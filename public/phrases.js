@@ -22,7 +22,7 @@
 
   window.DESCO_PHRASE_LEVELS = {
     nivel1: buildLevel({
-      number: 1, label: 'Primeros pasos', secondsPerWord: 6,
+      number: 1, label: 'Primeros pasos', phaseCount: 10, secondsPerWord: 6,
       typoDamage: 4, timeoutDamage: 5, healEvery: 1, healAmount: 12,
       punctuation: false, accents: false, scoreMultiplier: 1
     }, [
@@ -34,7 +34,7 @@
     ]),
 
     nivel2: buildLevel({
-      number: 2, label: 'Base firme', secondsPerWord: 5.5,
+      number: 2, label: 'Base firme', phaseCount: 10, secondsPerWord: 5.5,
       typoDamage: 5, timeoutDamage: 6, healEvery: 1, healAmount: 11,
       punctuation: false, accents: false, scoreMultiplier: 1.2
     }, [
@@ -46,7 +46,7 @@
     ]),
 
     nivel3: buildLevel({
-      number: 3, label: 'Ritmo constante', secondsPerWord: 5,
+      number: 3, label: 'Ritmo constante', phaseCount: 10, secondsPerWord: 5,
       typoDamage: 6, timeoutDamage: 7, healEvery: 2, healAmount: 10,
       punctuation: false, accents: false, scoreMultiplier: 1.45
     }, [
@@ -58,7 +58,7 @@
     ]),
 
     nivel4: buildLevel({
-      number: 4, label: 'Fluidez', secondsPerWord: 4.5,
+      number: 4, label: 'Fluidez', phaseCount: 10, secondsPerWord: 4.5,
       typoDamage: 7, timeoutDamage: 8, healEvery: 2, healAmount: 9,
       punctuation: false, accents: false, scoreMultiplier: 1.75
     }, [
@@ -70,7 +70,7 @@
     ]),
 
     nivel5: buildLevel({
-      number: 5, label: 'Acentos iniciales', secondsPerWord: 4,
+      number: 5, label: 'Acentos iniciales', phaseCount: 16, secondsPerWord: 4,
       typoDamage: 8, timeoutDamage: 9, healEvery: 2, healAmount: 8,
       punctuation: false, accents: true, scoreMultiplier: 2.1
     }, [
@@ -82,7 +82,7 @@
     ]),
 
     nivel6: buildLevel({
-      number: 6, label: 'Acentos avanzados', secondsPerWord: 3.5,
+      number: 6, label: 'Acentos avanzados', phaseCount: 16, secondsPerWord: 3.5,
       typoDamage: 9, timeoutDamage: 10, healEvery: 3, healAmount: 8,
       punctuation: false, accents: true, scoreMultiplier: 2.5
     }, [
@@ -94,7 +94,7 @@
     ]),
 
     nivel7: buildLevel({
-      number: 7, label: 'Puntuación', secondsPerWord: 3,
+      number: 7, label: 'Puntuación', phaseCount: 16, secondsPerWord: 3,
       typoDamage: 10, timeoutDamage: 12, healEvery: 3, healAmount: 7,
       punctuation: true, accents: true, scoreMultiplier: 3
     }, [
@@ -106,7 +106,7 @@
     ]),
 
     nivel8: buildLevel({
-      number: 8, label: 'Dominio total', secondsPerWord: 2.4,
+      number: 8, label: 'Dominio total', phaseCount: 16, secondsPerWord: 2.4,
       typoDamage: 12, timeoutDamage: 14, healEvery: 4, healAmount: 6,
       punctuation: true, accents: true, scoreMultiplier: 3.6
     }, [

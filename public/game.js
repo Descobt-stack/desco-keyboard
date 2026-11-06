@@ -11,6 +11,8 @@
   const MAX_PARTICLES = 96;
   const MAX_FLOATING_TEXT = 12;
   const SCOREBOARD_VERSION = '2026-11-score-v2';
+  const TRAINER_STORAGE_KEY = 'desco-keyboard-letter-misses-v1';
+  const PHRASE_HISTORY_PREFIX = 'desco-keyboard-phrase-history-v1-';
   const API_BASE = location.hostname.endsWith('github.io')
     ? 'https://desco-keyboard.josuepmvf.chatgpt.site'
     : '';
@@ -138,6 +140,7 @@
     phraseHadError: false,
     correctKeys: 0,
     wrongKeys: 0,
+    letterMistakes: loadLetterMistakes(),
     startAt: 0,
     lastFrame: 0,
     wordDeadline: 0,
@@ -166,12 +169,52 @@
   };
 
   function currentLevel() { return LEVELS[state.level]; }
-  function currentEnemy() { return ENEMIES[state.wave]; }
+  function phaseCount(level = currentLevel()) {
+    return level.phaseCount || (level.number <= 4 ? 10 : 16);
+  }
+  function currentEnemy() { return ENEMIES[state.wave % ENEMIES.length]; }
   function currentLesson() { return state.lessons[state.wave]; }
   function sentenceWords() { return currentLesson()?.words || []; }
   function currentWord() { return sentenceWords()[state.wordIndex] || ''; }
   function currentTypingWord() {
     return currentWord().toLocaleLowerCase('es');
+  }
+
+  function loadLetterMistakes() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(TRAINER_STORAGE_KEY) || '{}');
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+      return Object.fromEntries(Object.entries(parsed)
+        .filter(([key, value]) => typeof key === 'string' && key.length <= 3 && Number.isFinite(value) && value > 0)
+        .map(([key, value]) => [key, Math.min(999, Math.round(value))]));
+    } catch {
+      return {};
+    }
+  }
+
+  function saveLetterMistakes() {
+    localStorage.setItem(TRAINER_STORAGE_KEY, JSON.stringify(state.letterMistakes));
+  }
+
+  function trainerChar(value) {
+    return String(value || '').toLocaleLowerCase('es').normalize('NFC');
+  }
+
+  function trainerFocusLetters(limit = 3) {
+    return Object.entries(state.letterMistakes)
+      .filter(([key, count]) => key.trim() && Number.isFinite(count) && count > 0)
+      .sort(([keyA, countA], [keyB, countB]) => countB - countA || keyA.localeCompare(keyB, 'es'))
+      .slice(0, limit)
+      .map(([key]) => key);
+  }
+
+  function updateTrainerUi() {
+    const status = $('trainerStatus');
+    if (!status) return;
+    const focus = trainerFocusLetters();
+    status.textContent = focus.length
+      ? `Entrenador local: dirigiré nuevas frases a ${focus.map((letter) => `“${letter}”`).join(', ')}. Tus datos no salen de este dispositivo.`
+      : 'Entrenador local: todavía estoy aprendiendo tus errores. Tus datos no salen de este dispositivo.';
   }
 
   function initAudio() {
@@ -203,6 +246,75 @@
     return text;
   }
 
+  function phraseHistory(levelNumber) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(`${PHRASE_HISTORY_PREFIX}${levelNumber}`) || '[]');
+      return Array.isArray(parsed) ? parsed.filter((item) => typeof item === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function shuffle(items) {
+    const copy = [...items];
+    for (let index = copy.length - 1; index > 0; index -= 1) {
+      const swapIndex = Math.floor(Math.random() * (index + 1));
+      [copy[index], copy[swapIndex]] = [copy[swapIndex], copy[index]];
+    }
+    return copy;
+  }
+
+  function buildLessons(level) {
+    const requested = phaseCount(level);
+    const pool = level.sections.flatMap((section) => section.phrases.map((text) => ({
+      section: section.title,
+      text,
+      words: text.split(' ')
+    })));
+    const history = phraseHistory(level.number);
+    const focus = trainerFocusLetters();
+    const scorePhrase = (item) => focus.reduce((score, letter) => {
+      const matches = item.text.toLocaleLowerCase('es').split(letter).length - 1;
+      return score + matches;
+    }, 0);
+    const fresh = pool.filter((item) => !history.includes(item.text));
+    const source = fresh.length >= requested ? fresh : pool;
+    const focused = shuffle(source.filter((item) => scorePhrase(item) > 0))
+      .sort((a, b) => scorePhrase(b) - scorePhrase(a));
+    const general = shuffle(source.filter((item) => scorePhrase(item) === 0));
+    const ordered = [...focused, ...general, ...shuffle(source.filter((item) => !focused.includes(item) && !general.includes(item)))];
+    const selected = [];
+    const seen = new Set();
+    ordered.forEach((item) => {
+      if (selected.length >= requested || seen.has(item.text)) return;
+      seen.add(item.text);
+      selected.push(item);
+    });
+    const nextHistory = [...history, ...selected.map((item) => item.text)].slice(-40);
+    localStorage.setItem(`${PHRASE_HISTORY_PREFIX}${level.number}`, JSON.stringify(nextHistory));
+    return selected;
+  }
+
+  function recordTypingMistakes(observed = state.typed) {
+    const expected = currentTypingWord();
+    const typed = String(observed || '').toLocaleLowerCase('es');
+    let recorded = 0;
+    const length = Math.max(expected.length, typed.length);
+    for (let index = 0; index < length && recorded < 3; index += 1) {
+      const expectedChar = trainerChar(expected[index]);
+      const typedChar = trainerChar(typed[index]);
+      if (expectedChar === typedChar) continue;
+      const key = typedChar || expectedChar;
+      if (!key || !key.trim()) continue;
+      state.letterMistakes[key] = Math.min(999, (state.letterMistakes[key] || 0) + 1);
+      recorded += 1;
+    }
+    if (recorded) {
+      saveLetterMistakes();
+      updateTrainerUi();
+    }
+  }
+
   function resetWordDeadline(now = performance.now()) {
     state.wordDeadline = now + currentLevel().secondsPerWord * 1000;
   }
@@ -219,10 +331,7 @@
     $('nameError').textContent = '';
     initAudio();
     state.mode = 'playing';
-    state.lessons = currentLevel().sections.map((section, sectionIndex) => {
-      const text = selectPhrase(section, sectionIndex);
-      return { section: section.title, text, words: text.split(' ') };
-    });
+    state.lessons = buildLessons(currentLevel());
     state.wordIndex = 0;
     state.typed = '';
     state.wave = 0;
@@ -260,6 +369,7 @@
     $('typingInput').placeholder = 'Escribe…';
     $('typingInput').value = '';
     $('typingInput').focus({ preventScroll: true });
+    updateTrainerUi();
     updateUi();
     tone(420, .09, 'triangle', .05);
   }
@@ -272,7 +382,7 @@
     state.enemyNextThinkAt = performance.now() + 1800 + Math.random() * 1600;
     $('enemyName').textContent = enemy.name;
     state.roundStartedAt = performance.now();
-    $('waveText').textContent = `OLEADA ${state.wave + 1}/${ENEMIES.length}`;
+    $('waveText').textContent = `FASE ${state.wave + 1}/${state.lessons.length}`;
   }
 
   function pauseGame() {
@@ -313,7 +423,7 @@
     $('typingInput').disabled = true;
     $('typingInput').value = '';
     $('lessonLabel').textContent = 'Selecciona un nivel para comenzar';
-    $('sentenceCount').textContent = 'RONDA 1/5';
+    $('sentenceCount').textContent = `RONDA 1/${phaseCount()}`;
     $('streakLabel').textContent = 'RACHA PERFECTA 0';
     $('sentenceLine').replaceChildren();
     const ready = document.createElement('span');
@@ -324,6 +434,7 @@
     $('sentenceLine').append(ready, prompt);
     $('lessonProgress').style.width = '0%';
     $('pauseGameButton').textContent = 'Pausa';
+    updateTrainerUi();
     loadLeaderboard();
   }
 
@@ -331,6 +442,12 @@
     if (!state.startAt) return 0;
     const now = state.mode === 'paused' ? state.pausedAt : performance.now();
     return Math.max((now - state.startAt) / 60000, 0.001);
+  }
+
+  function elapsedMilliseconds() {
+    if (!state.startAt) return 0;
+    const now = state.mode === 'paused' ? state.pausedAt : performance.now();
+    return Math.max(1000, Math.round(now - state.startAt));
   }
 
   function getWpm() { return Math.round((state.correctKeys / 5) / elapsedMinutes()); }
@@ -448,8 +565,9 @@
     updateUi();
   }
 
-  function typo() {
+  function typo(observed = state.typed) {
     const damage = currentLevel().typoDamage;
+    recordTypingMistakes(observed);
     state.wrongKeys += 1;
     state.combo = 0;
     state.phraseHadError = true;
@@ -601,10 +719,14 @@
     const entry = {
       name: state.playerName,
       level,
-      wpm: getWpm(),
+      wpm: Math.min(200, getWpm()),
       accuracy: getAccuracy(),
       hp: Math.round(state.playerHp),
-      completed: Boolean(won)
+      completed: Boolean(won),
+      correctKeys: state.correctKeys,
+      wrongKeys: state.wrongKeys,
+      durationMs: elapsedMilliseconds(),
+      phasesCompleted: won ? state.lessons.length : Math.max(0, state.wave)
     };
     entry.score = scoreFor(entry.wpm, entry.accuracy, entry.hp, entry.completed);
     saveLocalScore(entry);
@@ -679,7 +801,7 @@
     if (input.endsWith(' ')) {
       if (input.slice(0, -1).toLocaleLowerCase('es') === target && state.typed === target) completeWord();
       else {
-        typo();
+        typo(input.slice(0, -1));
         event.target.value = state.typed;
       }
       return;
@@ -692,7 +814,7 @@
       for (let i = 0; i < added; i += 1) lightAttack(state.correctKeys - added + i + 1);
       updateUi();
     } else {
-      typo();
+      typo(comparableInput);
       event.target.value = state.typed;
     }
   }
@@ -1012,7 +1134,7 @@
     }
     if (state.pendingWaveAdvanceAt && now >= state.pendingWaveAdvanceAt) {
       state.pendingWaveAdvanceAt = 0;
-      if (state.wave === ENEMIES.length - 1) finishGame(true);
+      if (state.wave === state.lessons.length - 1) finishGame(true);
       else {
         state.wave += 1;
         state.wordIndex = 0;
@@ -1091,7 +1213,9 @@
     const writing = level.punctuation
       ? 'incluye acentos, comas, puntos y otros signos'
       : level.accents ? 'incluye palabras con acentos' : 'usa frases sin acentos ni signos';
-    $('levelRules').textContent = `Nivel ${level.number}: ${writing}. Recuperas ${level.healAmount} de vida cada ${level.healEvery} ${level.healEvery === 1 ? 'frase limpia' : 'frases limpias'}. Puedes usar borrar, espacio y Enter.`;
+    const phases = phaseCount(level);
+    $('levelRules').textContent = `Nivel ${level.number}: ${phases} fases · ${writing}. Recuperas ${level.healAmount} de vida cada ${level.healEvery} ${level.healEvery === 1 ? 'frase limpia' : 'frases limpias'}. El límite oculto es de ${level.secondsPerWord} s por palabra. Puedes usar borrar, espacio y Enter.`;
+    updateTrainerUi();
   }
 
   document.querySelectorAll('.difficulty').forEach((button) => {
@@ -1119,7 +1243,7 @@
     if (event.key !== 'Enter' || state.mode !== 'playing') return;
     event.preventDefault();
     if (state.typed === currentTypingWord()) completeWord();
-    else typo();
+    else typo(state.typed);
   });
   $('typingInput').addEventListener('paste', (event) => event.preventDefault());
   $('arenaWrap').addEventListener('click', () => {
@@ -1190,6 +1314,7 @@
   updateBest();
   $('playerName').value = state.playerName;
   updateLevelRules();
+  updateTrainerUi();
   loadLeaderboard();
   buildBackgroundCache();
   requestAnimationFrame(render);

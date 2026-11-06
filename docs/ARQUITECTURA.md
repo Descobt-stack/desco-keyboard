@@ -7,17 +7,17 @@ Yo convertí una práctica de mecanografía en un combate visual. Mantengo la es
 ## Flujo que programé
 
 1. Guardo el nombre y el nivel que eligió el jugador.
-2. Selecciono una frase diferente para cada una de las cinco secciones.
+2. Construyo una campaña de 10 fases en los niveles 1–4 y de 16 fases en los niveles 5–8, tomando frases distintas del banco de 50.
 3. Comparo la entrada con la palabra activa después de cada cambio.
 4. Encolo un golpe por cada letra correcta.
 5. Confirmo la palabra con `Espacio` o `Enter`; `Backspace` permite corregir el prefijo escrito.
 6. Si hay error o se agota el tiempo oculto, marco la frase como imperfecta y el rival ataca.
-7. Al cerrar una frase, calculo derrota del rival, progreso de curación y cambio de sección.
+7. Al cerrar una frase, calculo derrota del rival, progreso de curación y cambio de fase.
 8. Al finalizar guardo la mejor marca local y envío una puntuación validada al tablero global.
 
 ## Mis ocho niveles
 
-Cada nivel tiene cinco secciones de diez frases. Los primeros cuatro no usan acentos ni signos. Los niveles 5 y 6 incorporan acentos. Los niveles 7 y 8 exigen signos completos. El tiempo baja de 6 a 2.4 segundos por palabra y la curación necesita entre una y cuatro frases limpias.
+Cada nivel conserva 50 frases, organizadas en cinco temas para poder alternarlas. En cada partida selecciono 10 fases en los primeros cuatro niveles y 16 en los cuatro avanzados. Los primeros cuatro no usan acentos ni signos. Los niveles 5 y 6 incorporan acentos. Los niveles 7 y 8 exigen signos completos. El tiempo baja de 6 a 2.4 segundos por palabra y la curación necesita entre una y cuatro frases limpias.
 
 ## Cola de combate
 
@@ -35,11 +35,15 @@ Las poses viven en `COMBAT_CLIPS`. Interpolo cadera, manos y pies y luego resuel
 
 La frase usa un contenedor flexible con salto de línea. Cada palabra es una unidad indivisible, por lo que el navegador mueve la palabra completa a la siguiente línea en lugar de recortarla. En pantallas pequeñas reduzco el tamaño de letra, pero no vuelvo a usar desplazamiento horizontal.
 
+## Entrenador local
+
+`recordTypingMistakes()` compara la palabra que esperaba con el texto que fallé. Acumulo las letras problemáticas en `localStorage`, sin enviarlas al servidor. En la siguiente partida `buildLessons()` prioriza frases que contienen mis tres letras con más errores; así practico un patrón concreto en lugar de recibir frases al azar. El panel del menú me muestra qué letras está usando el entrenador.
+
 ## Tablero global
 
-El navegador envía nombre, nivel, PPM, precisión, vida restante y si completé el nivel. El Worker valida rangos, vuelve a calcular la puntuación y guarda solo la mejor marca independiente de cada jugador y nivel. La fórmula no acumula niveles y una partida incompleta vale el 10% de su resultado. La nueva temporada deja fuera las marcas anteriores sin permitir que bloqueen una nueva marca. Si el servicio no responde, conservo una tabla local temporal que también se reinicia por versión.
+El navegador envía nombre, nivel, PPM, precisión, vida restante, teclas correctas e incorrectas, duración y fases terminadas. El Worker vuelve a calcular PPM y precisión a partir de esas métricas, exige que coincidan con la marca declarada, comprueba si la cantidad de fases corresponde al nivel y guarda solo la mejor marca independiente de cada jugador y nivel. La fórmula no acumula niveles y una partida incompleta vale el 10% de su resultado. La nueva temporada deja fuera las marcas anteriores sin permitir que bloqueen una nueva marca. Si el servicio no responde, conservo una tabla local temporal que también se reinicia por versión.
 
-La tabla no usa contraseñas ni publica correos. El Worker además limita el origen, el tamaño del JSON y los envíos repetidos. Es un tablero casual; una futura fase puede añadir identidad y verificación más fuerte contra puntuaciones manipuladas.
+La tabla no usa contraseñas ni publica correos. El Worker además limita el origen, el tamaño del JSON y los envíos repetidos a 10 por minuto por cliente. Esta validación eleva la barrera contra puntuaciones falsas; una futura fase podría añadir identidad y una sesión firmada para una verificación todavía más fuerte.
 
 ## Publicación doble
 

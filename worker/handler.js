@@ -4,7 +4,9 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 const MAX_SCORE_BODY_BYTES = 2048;
 const SCORE_RATE_WINDOW_MS = 60_000;
-const SCORE_RATE_LIMIT = 30;
+const SCORE_RATE_LIMIT = 10;
+const MAX_SCORE_DURATION_MS = 6 * 60 * 60 * 1000;
+const MAX_SCORE_KEYS = 20_000;
 // Nueva temporada: las marcas anteriores quedan fuera del tablero activo.
 // Se conservan en D1 para no hacer una eliminación irreversible desde el Worker.
 const SCOREBOARD_RESET_AT = Date.parse('2026-11-06T16:20:54.803Z');
@@ -67,6 +69,19 @@ function scoreFor(wpm, accuracy, hp, completed) {
   return completed ? raw : Math.round(raw * .1);
 }
 
+function phaseCountForLevel(level) {
+  return level <= 4 ? 10 : 16;
+}
+
+function derivedWpm(correctKeys, durationMs) {
+  return Math.round((correctKeys / 5) / Math.max(durationMs / 60_000, 0.001));
+}
+
+function derivedAccuracy(correctKeys, wrongKeys) {
+  const total = correctKeys + wrongKeys;
+  return total ? Math.round((correctKeys / total) * 100) : 100;
+}
+
 function scoreClientKey(request) {
   return request.headers.get('cf-connecting-ip')
     || request.headers.get('x-forwarded-for')
@@ -127,10 +142,26 @@ async function saveScore(request, env) {
   const accuracy = Number(body?.accuracy);
   const hp = Number(body?.hp);
   const completed = body?.completed === true;
+  const correctKeys = Number(body?.correctKeys);
+  const wrongKeys = Number(body?.wrongKeys);
+  const durationMs = Number(body?.durationMs);
+  const phasesCompleted = Number(body?.phasesCompleted);
   if (!validName(name) || !validInteger(level, 1, 8) || !validInteger(wpm, 0, 300)
     || !validInteger(accuracy, 0, 100) || !validInteger(hp, 0, 100)
-    || typeof body?.completed !== 'boolean') {
+    || typeof body?.completed !== 'boolean'
+    || !validInteger(correctKeys, 0, MAX_SCORE_KEYS)
+    || !validInteger(wrongKeys, 0, MAX_SCORE_KEYS)
+    || !validInteger(durationMs, 1000, MAX_SCORE_DURATION_MS)
+    || !validInteger(phasesCompleted, 0, phaseCountForLevel(level))) {
     return json(request, { error: 'Puntuación inválida.' }, 400);
+  }
+
+  const expectedWpm = Math.min(200, Math.max(0, derivedWpm(correctKeys, durationMs)));
+  const expectedAccuracy = derivedAccuracy(correctKeys, wrongKeys);
+  const expectedPhases = phaseCountForLevel(level);
+  if (Math.abs(wpm - expectedWpm) > 1 || accuracy !== expectedAccuracy
+    || (completed ? phasesCompleted !== expectedPhases : phasesCompleted >= expectedPhases)) {
+    return json(request, { error: 'La marca no coincide con el entrenamiento.' }, 422);
   }
 
   const normalizedName = normalizeName(name);

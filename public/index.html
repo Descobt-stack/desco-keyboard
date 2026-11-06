@@ -49,7 +49,7 @@
               <button type="button" id="settingsGameButton">Ajustes</button>
               <button type="button" id="helpGameButton">Cómo jugar</button>
             </div>
-            <span>CAMPAÑA DE 5 SECCIONES</span>
+            <span>CAMPAÑA · 8 NIVELES · 10/16 FASES</span>
           </div>
 
           <canvas id="arena" width="1280" height="720" aria-label="Arena de combate stickman"></canvas>
@@ -60,7 +60,7 @@
               <div class="health-track"><span id="playerHealth"></span></div>
             </div>
             <div class="round-badge">
-              <span id="waveText">OLEADA 1/5</span>
+              <span id="waveText">FASE 1/10</span>
               <strong id="comboText">x0</strong>
             </div>
             <div class="fighter-hud enemy-hud">
@@ -82,17 +82,18 @@
                 </label>
 
                 <div class="difficulty-grid" role="group" aria-label="Selecciona el nivel">
-                  <button class="difficulty active" type="button" data-level="nivel1"><span>01</span><strong>Primeros pasos</strong><small>6 s · sin acentos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel2"><span>02</span><strong>Base firme</strong><small>5.5 s · sin acentos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel3"><span>03</span><strong>Ritmo constante</strong><small>5 s · sin acentos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel4"><span>04</span><strong>Fluidez</strong><small>4.5 s · sin acentos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel5"><span>05</span><strong>Acentos iniciales</strong><small>4 s · incluye acentos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel6"><span>06</span><strong>Acentos avanzados</strong><small>3.5 s · más vocabulario</small></button>
-                  <button class="difficulty" type="button" data-level="nivel7"><span>07</span><strong>Puntuación</strong><small>3 s · comas y puntos</small></button>
-                  <button class="difficulty" type="button" data-level="nivel8"><span>08</span><strong>Dominio total</strong><small>2.4 s · signos completos</small></button>
+                  <button class="difficulty active" type="button" data-level="nivel1"><span>01</span><strong>Primeros pasos</strong><small>10 fases · 6 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel2"><span>02</span><strong>Base firme</strong><small>10 fases · 5.5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel3"><span>03</span><strong>Ritmo constante</strong><small>10 fases · 5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel4"><span>04</span><strong>Fluidez</strong><small>10 fases · 4.5 s · sin acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel5"><span>05</span><strong>Acentos iniciales</strong><small>16 fases · 4 s · acentos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel6"><span>06</span><strong>Acentos avanzados</strong><small>16 fases · 3.5 s · vocabulario</small></button>
+                  <button class="difficulty" type="button" data-level="nivel7"><span>07</span><strong>Puntuación</strong><small>16 fases · 3 s · signos</small></button>
+                  <button class="difficulty" type="button" data-level="nivel8"><span>08</span><strong>Dominio total</strong><small>16 fases · 2.4 s · signos completos</small></button>
                 </div>
 
                 <p class="level-rules" id="levelRules" aria-live="polite">Nivel 1: frases sencillas sin acentos ni signos. Puedes usar borrar, espacio y Enter.</p>
+                <p class="trainer-status" id="trainerStatus" aria-live="polite"></p>
                 <button class="primary-button" id="startButton" type="button">INICIAR ENTRENAMIENTO</button>
                 <p class="form-error" id="nameError" aria-live="polite"></p>
                 <p class="keyboard-note">Usa un teclado físico para obtener la mejor experiencia.</p>
@@ -141,7 +142,7 @@
 
             <div class="word-zone" id="wordZone">
               <div class="sentence-meta">
-              <span id="sentenceCount">RONDA 1/5</span>
+              <span id="sentenceCount">RONDA 1/10</span>
                 <span id="lessonLabel">Selecciona un nivel para comenzar</span>
                 <span id="streakLabel">RACHA PERFECTA 0</span>
               </div>
@@ -192,7 +193,7 @@
           <li><strong>Escribe la palabra iluminada.</strong><span>Cada letra correcta activa un ataque ligero.</span></li>
           <li><strong>Presiona espacio o Enter al terminar.</strong><span>También puedes usar borrar para corregir antes de confirmar.</span></li>
           <li><strong>Cuida la precisión.</strong><span>El rival solo ataca si cometes un error o tardas demasiado en una palabra.</span></li>
-          <li><strong>Supera las cinco secciones.</strong><span>Hay ocho niveles y cada uno alterna 50 frases diferentes.</span></li>
+          <li><strong>Supera las fases del nivel.</strong><span>Los niveles 1–4 tienen 10 fases; los niveles 5–8 tienen 16. Cada partida alterna frases del banco de 50.</span></li>
         </ol>
         <p class="tip">Consejo: mira la palabra, no tus manos. Las marcas de F y J te ayudan a volver a la posición inicial.</p>
       </form>

@@ -21,7 +21,8 @@ Aquí configuré los ocho niveles. Cada nivel define:
 - cuántas frases limpias necesito para curarme;
 - vida que recupero;
 - uso de acentos y puntuación;
-- cinco secciones con diez frases cada una.
+- cinco temas con diez frases cada uno;
+- diez fases jugables en los niveles 1–4 y dieciséis en los niveles 5–8.
 
 Uso `buildSection()` para combinar partes gramaticales compatibles. Al cargar el archivo verifico que cada nivel tenga exactamente 50 frases.
 
@@ -29,11 +30,13 @@ Uso `buildSection()` para combinar partes gramaticales compatibles. Al cargar el
 
 Este es mi motor principal. `state` guarda toda la partida: nivel, nombre, frase, palabra, vida, combo, errores, tiempos, curación y animaciones.
 
+`buildLessons()` aplana los cinco temas, evita repetir las frases más recientes y selecciona 10 o 16 fases según el nivel. Si ya tengo letras falladas, prioriza las frases que contienen esas letras.
+
 `handleInput()` compara el texto con la palabra actual. Si agrego varias letras en un solo evento, encolo un golpe por cada una. Si borro, simplemente reduzco el prefijo correcto. `Espacio` y `Enter` llaman a `completeWord()` cuando la palabra está lista.
 
 `resetWordDeadline()` prepara el límite oculto. No dibujo un cronómetro porque quiero que el jugador se concentre en escribir.
 
-`typo()` y `enemyAttack()` son las únicas rutas normales que permiten golpear al jugador. Las dos marcan la frase como imperfecta, por lo que esa frase ya no cuenta para curación.
+`recordTypingMistakes()` compara la palabra esperada con lo que escribí y guarda contadores de letras en `localStorage`. `trainerFocusLetters()` obtiene las tres letras con más fallos y `updateTrainerUi()` me lo explica sin mandar datos fuera del navegador. `typo()` y `enemyAttack()` son las únicas rutas normales que permiten golpear al jugador. Las dos marcan la frase como imperfecta, por lo que esa frase ya no cuenta para curación.
 
 ## Cómo hice las animaciones
 
@@ -76,7 +79,7 @@ Aquí serví el juego y creé dos rutas:
 
 Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. La temporada nueva ignora las marcas anteriores para que el tablero empiece limpio.
 
-También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 30 envíos por minuto y añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria es una barrera adicional; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
+También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 10 envíos por minuto y vuelvo a calcular PPM, precisión y fases terminadas a partir de las métricas enviadas. Añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria y la validación cruzada son barreras adicionales; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
 
 ## Base de datos
 
