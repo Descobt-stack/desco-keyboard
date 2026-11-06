@@ -34,7 +34,7 @@ Este es mi motor principal. `state` guarda toda la partida: nivel, nombre, frase
 
 `handleInput()` compara el texto con la palabra actual. Si agrego varias letras en un solo evento, encolo un golpe por cada una. Si borro, simplemente reduzco el prefijo correcto. `Espacio` y `Enter` llaman a `completeWord()` cuando la palabra está lista.
 
-`resetWordDeadline()` prepara el límite oculto. No dibujo un cronómetro porque quiero que el jugador se concentre en escribir.
+`resetWordDeadline()` prepara el límite de cada palabra. `updateTimerUi()` muestra el tiempo restante con décimas, cambia de color cuando queda poco y actualiza la barra de progreso de la fase. El límite continúa sincronizado con la pausa y con el ataque autónomo del rival.
 
 `recordTypingMistakes()` compara la palabra esperada con lo que escribí y guarda contadores de letras en `localStorage`. `trainerFocusLetters()` obtiene las tres letras con más fallos y `updateTrainerUi()` me lo explica sin mandar datos fuera del navegador. `typo()` y `enemyAttack()` son las únicas rutas normales que permiten golpear al jugador. Las dos marcan la frase como imperfecta, por lo que esa frase ya no cuenta para curación.
 

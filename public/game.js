@@ -319,6 +319,32 @@
     state.wordDeadline = now + currentLevel().secondsPerWord * 1000;
   }
 
+  function updateTimerUi(now = performance.now()) {
+    const level = currentLevel();
+    const totalSeconds = Math.max(.1, Number(level.secondsPerWord) || 1);
+    const totalPhases = state.lessons.length || phaseCount(level);
+    const currentPhase = state.lessons.length ? Math.min(totalPhases, state.wave + 1) : 1;
+    const reference = state.mode === 'paused' ? state.pausedAt : now;
+    const remaining = state.startAt && state.wordDeadline
+      ? Math.max(0, Math.min(totalSeconds, (state.wordDeadline - reference) / 1000))
+      : totalSeconds;
+    const phaseText = $('phaseText');
+    const phaseProgress = $('phaseProgress');
+    const wordTimerText = $('wordTimerText');
+    const wordTimerProgress = $('wordTimerProgress');
+    const roundBadge = document.querySelector('.round-badge');
+    if (phaseText) phaseText.textContent = `FASE ${currentPhase}/${totalPhases}`;
+    if (phaseProgress) phaseProgress.style.width = `${(currentPhase / totalPhases) * 100}%`;
+    if (wordTimerText) wordTimerText.textContent = state.mode === 'paused'
+      ? `PAUSADO · ${remaining.toFixed(1)} s`
+      : `TIEMPO ${remaining.toFixed(1)} s`;
+    if (wordTimerProgress) wordTimerProgress.style.width = `${(remaining / totalSeconds) * 100}%`;
+    if (roundBadge) {
+      roundBadge.classList.toggle('timer-warning', remaining <= totalSeconds * .35 && remaining > totalSeconds * .12);
+      roundBadge.classList.toggle('timer-danger', remaining <= totalSeconds * .12);
+    }
+  }
+
   function beginGame() {
     const requestedName = $('playerName').value.trim().replace(/\s+/g, ' ');
     if (!/^[\p{L}\p{N} _.-]{2,20}$/u.test(requestedName)) {
@@ -382,7 +408,7 @@
     state.enemyNextThinkAt = performance.now() + 1800 + Math.random() * 1600;
     $('enemyName').textContent = enemy.name;
     state.roundStartedAt = performance.now();
-    $('waveText').textContent = `FASE ${state.wave + 1}/${state.lessons.length}`;
+    updateTimerUi();
   }
 
   function pauseGame() {
@@ -392,6 +418,7 @@
     $('pausePanel').classList.remove('hidden');
     $('typingInput').disabled = true;
     $('pauseGameButton').textContent = 'Continuar';
+    updateTimerUi();
   }
 
   function resumeGame() {
@@ -409,6 +436,7 @@
     $('typingInput').disabled = false;
     $('typingInput').focus({ preventScroll: true });
     $('pauseGameButton').textContent = 'Pausa';
+    updateTimerUi();
   }
 
   function returnToMenu() {
@@ -423,7 +451,7 @@
     $('typingInput').disabled = true;
     $('typingInput').value = '';
     $('lessonLabel').textContent = 'Selecciona un nivel para comenzar';
-    $('sentenceCount').textContent = `RONDA 1/${phaseCount()}`;
+    $('sentenceCount').textContent = `FASE 1/${phaseCount()}`;
     $('streakLabel').textContent = 'RACHA PERFECTA 0';
     $('sentenceLine').replaceChildren();
     const ready = document.createElement('span');
@@ -434,6 +462,7 @@
     $('sentenceLine').append(ready, prompt);
     $('lessonProgress').style.width = '0%';
     $('pauseGameButton').textContent = 'Pausa';
+    updateTimerUi();
     updateTrainerUi();
     loadLeaderboard();
   }
@@ -773,7 +802,7 @@
     const word = currentTypingWord();
     const words = sentenceWords();
     renderSentence();
-    $('sentenceCount').textContent = `RONDA ${state.wave + 1}/${state.lessons.length}`;
+    $('sentenceCount').textContent = `FASE ${state.wave + 1}/${state.lessons.length}`;
     $('lessonLabel').textContent = `${currentLevel().label} · ${currentLesson().section}`;
     $('streakLabel').textContent = `RECUPERACIÓN ${state.healProgress}/${currentLevel().healEvery} · RACHA ${state.combo}`;
     const phraseProgress = (state.wordIndex + (state.typed.length / Math.max(word.length, 1))) / Math.max(words.length, 1);
@@ -783,6 +812,7 @@
     $('playerHpText').textContent = Math.ceil(state.playerHp);
     $('enemyHpText').textContent = Math.ceil(state.enemyHp);
     $('comboText').textContent = `x${state.combo}`;
+    updateTimerUi();
     updateLiveStats();
   }
 
@@ -1184,6 +1214,7 @@
     state.lastFrame = now;
     state.sceneTime += delta;
     updateCombat(now);
+    updateTimerUi(now);
     state.effectAccumulator = Math.min(state.effectAccumulator + delta, MAX_FRAME_DELTA * 2);
     while (state.effectAccumulator >= TARGET_FRAME_MS) {
       tickEffects(TARGET_FRAME_MS);

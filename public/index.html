@@ -60,8 +60,12 @@
               <div class="health-track"><span id="playerHealth"></span></div>
             </div>
             <div class="round-badge">
-              <span id="waveText">FASE 1/10</span>
-              <strong id="comboText">x0</strong>
+              <span class="phase-caption">PROGRESO DEL NIVEL</span>
+              <strong id="phaseText">FASE 1/10</strong>
+              <div class="phase-track" aria-hidden="true"><span id="phaseProgress"></span></div>
+              <small id="wordTimerText" aria-live="polite">TIEMPO 6.0 s</small>
+              <div class="timer-track" aria-hidden="true"><span id="wordTimerProgress"></span></div>
+              <em id="comboText">x0</em>
             </div>
             <div class="fighter-hud enemy-hud">
               <div class="hud-label"><strong id="enemyHpText">100</strong><span id="enemyName">SOMBRA</span></div>
@@ -142,7 +146,7 @@
 
             <div class="word-zone" id="wordZone">
               <div class="sentence-meta">
-              <span id="sentenceCount">RONDA 1/10</span>
+              <span id="sentenceCount">FASE 1/10</span>
                 <span id="lessonLabel">Selecciona un nivel para comenzar</span>
                 <span id="streakLabel">RACHA PERFECTA 0</span>
               </div>
