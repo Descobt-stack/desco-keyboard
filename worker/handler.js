@@ -21,6 +21,8 @@ const SCORE_PROFILES = [
 ];
 // Mantengo las marcas históricas. La puntuación nueva se agrega sobre el mismo tablero.
 const SCOREBOARD_RESET_AT = 0;
+// Esta marca fue una prueba inválida y queda fuera del tablero sin tocar las demás.
+const HIDDEN_INVALID_SCORE = { normalizedName: 'ángel', level: 8, score: 85560 };
 const scoreRateBuckets = new Map();
 
 const ASSET_TYPES = {
@@ -178,16 +180,20 @@ async function readLeaderboard(request, env) {
       `SELECT player_name AS name, level, score, wpm, accuracy
        FROM scores
        WHERE updated_at >= ? AND level = ?
+         AND NOT (normalized_name = ? AND level = ? AND score = ?)
        ORDER BY score DESC, updated_at ASC
        LIMIT 50`
-    ).bind(SCOREBOARD_RESET_AT, level).all()
+    ).bind(SCOREBOARD_RESET_AT, level, HIDDEN_INVALID_SCORE.normalizedName,
+      HIDDEN_INVALID_SCORE.level, HIDDEN_INVALID_SCORE.score).all()
     : await env.DB.prepare(
       `SELECT player_name AS name, level, score, wpm, accuracy
        FROM scores
        WHERE updated_at >= ?
+         AND NOT (normalized_name = ? AND level = ? AND score = ?)
        ORDER BY score DESC, updated_at ASC
        LIMIT 50`
-    ).bind(SCOREBOARD_RESET_AT).all();
+    ).bind(SCOREBOARD_RESET_AT, HIDDEN_INVALID_SCORE.normalizedName,
+      HIDDEN_INVALID_SCORE.level, HIDDEN_INVALID_SCORE.score).all();
   return json(request, (result.results || []).map((entry) => ({
     ...entry,
     grade: scoreGrade(Number(entry.score), Number(entry.level))
@@ -199,8 +205,10 @@ async function resolvePlayerIdentity(env, level, name, normalizedName, deviceId)
   const result = await env.DB.prepare(
     `SELECT id, player_name, normalized_name, score
      FROM scores
-     WHERE level = ?`
-  ).bind(level).all();
+     WHERE level = ?
+       AND NOT (normalized_name = ? AND level = ? AND score = ?)`
+  ).bind(level, HIDDEN_INVALID_SCORE.normalizedName,
+    HIDDEN_INVALID_SCORE.level, HIDDEN_INVALID_SCORE.score).all();
   const rows = (result.results || []).filter((row) => {
     const storedKey = String(row.normalized_name || '');
     return storedKey === normalizedName
@@ -236,7 +244,13 @@ async function resolvePlayerIdentity(env, level, name, normalizedName, deviceId)
 }
 
 async function topScoreForLevel(env, level) {
-  const result = await env.DB.prepare('SELECT MAX(score) AS score FROM scores WHERE level = ?').bind(level).first();
+  const result = await env.DB.prepare(
+    `SELECT MAX(score) AS score
+     FROM scores
+     WHERE level = ?
+       AND NOT (normalized_name = ? AND level = ? AND score = ?)`
+  ).bind(level, HIDDEN_INVALID_SCORE.normalizedName,
+    HIDDEN_INVALID_SCORE.level, HIDDEN_INVALID_SCORE.score).first();
   return Number(result?.score || 0);
 }
 

@@ -516,9 +516,9 @@
   }
 
   function getRank() {
-    const performanceScore = scoreFor(currentLevel().number, getWpm(), getAccuracy(), state.playerHp,
-      state.bestCombo, state.correctKeys, 100, true);
-    return scoreGrade(performanceScore, currentLevel().number);
+    const performance = scorePerformance(currentLevel().number, getWpm(), getAccuracy(), state.playerHp,
+      state.bestCombo, state.correctKeys);
+    return performanceGrade(performance);
   }
 
   function createImpact(x, y, color, amount = 12) {
@@ -717,15 +717,29 @@
     return Math.max(0, Math.min(1, Number(value) / Math.max(1, target)));
   }
 
-  function scoreFor(levelNumber, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed) {
+  function scorePerformance(levelNumber, wpm, accuracy, hp, bestCombo, correctKeys) {
     const profile = scoreProfile(levelNumber);
     const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
-    const progress = completed ? 1 : scoreRatio(progressPercent, 100);
-    const weighted = scoreRatio(cappedWpm, profile.targetWpm) * .25
+    return scoreRatio(cappedWpm, profile.targetWpm) * .25
       + scoreRatio(accuracy, 100) * .25
       + scoreRatio(correctKeys, profile.letterTarget) * .20
       + scoreRatio(bestCombo, profile.comboTarget) * .15
       + scoreRatio(hp, 100) * .15;
+  }
+
+  function performanceGrade(performance) {
+    if (performance >= .9) return 'SS';
+    if (performance >= .78) return 'S';
+    if (performance >= .65) return 'A';
+    if (performance >= .52) return 'B';
+    if (performance >= .38) return 'C';
+    return 'D';
+  }
+
+  function scoreFor(levelNumber, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed) {
+    const profile = scoreProfile(levelNumber);
+    const progress = completed ? 1 : scoreRatio(progressPercent, 100);
+    const weighted = scorePerformance(levelNumber, wpm, accuracy, hp, bestCombo, correctKeys);
     if (!completed) return Math.round(profile.cap * weighted * progress * .1);
     const bandStart = scoreBandStart(levelNumber);
     const bandWidth = Math.max(1, profile.cap - bandStart);
