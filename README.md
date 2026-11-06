@@ -16,6 +16,7 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - Rival con movimiento autónomo y defensa automática mientras aún queda tiempo para escribir.
 - Golpe fuerte o patada al terminar una palabra.
 - Tablero global con nombre, nivel y mejor puntuación por jugador.
+- Puntuación independiente por nivel: las partidas completas conservan el 100% y las incompletas solo el 10%, sin cifras gigantes.
 - Pausa manual y automática al cambiar de pestaña.
 - Tema oscuro y claro, sonido Web Audio, PPM, precisión, rango, combo y salud.
 - Interfaz adaptable a laptop, tableta y teléfono.

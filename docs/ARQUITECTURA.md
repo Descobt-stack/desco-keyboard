@@ -37,7 +37,7 @@ La frase usa un contenedor flexible con salto de línea. Cada palabra es una uni
 
 ## Tablero global
 
-El navegador envía nombre, nivel, PPM, precisión y vida restante. El Worker valida rangos, vuelve a calcular la puntuación y guarda solo la mejor marca de cada nombre por nivel. D1 usa una restricción única sobre nombre normalizado y nivel. Si el servicio no responde, conservo una tabla local temporal.
+El navegador envía nombre, nivel, PPM, precisión, vida restante y si completé el nivel. El Worker valida rangos, vuelve a calcular la puntuación y guarda solo la mejor marca independiente de cada jugador y nivel. La fórmula no acumula niveles y una partida incompleta vale el 10% de su resultado. La nueva temporada deja fuera las marcas anteriores sin permitir que bloqueen una nueva marca. Si el servicio no responde, conservo una tabla local temporal que también se reinicia por versión.
 
 La tabla no usa contraseñas ni publica correos. El Worker además limita el origen, el tamaño del JSON y los envíos repetidos. Es un tablero casual; una futura fase puede añadir identidad y verificación más fuerte contra puntuaciones manipuladas.
 

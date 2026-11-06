@@ -59,13 +59,13 @@ El enemigo también tiene un pequeño pensamiento autónomo: `enemyNextThinkAt` 
 
 ## Cómo calculo la puntuación
 
-Uso nivel, PPM, precisión y vida restante:
+Cada nivel tiene su propia marca; no sumo el número de nivel ni arrastro puntos de una ronda a otra. Uso PPM, precisión y vida restante:
 
 ```js
-nivel * 10000 + ppm * 100 + precision * 10 + vida
+ppmLimitado * 10 + precision * 2 + vida * 2
 ```
 
-El Worker repite este cálculo; no confía en el número enviado por el navegador.
+Limito las PPM a 200 para que la cifra siga siendo corta. Si completo el nivel guardo el resultado completo; si abandono o pierdo, guardo únicamente el 10%. El Worker repite este cálculo y no confía en el número enviado por el navegador.
 
 ## `worker/handler.js`
 
@@ -74,7 +74,7 @@ Aquí serví el juego y creé dos rutas:
 - `GET /api/leaderboard`: devuelve las 50 mejores marcas.
 - `POST /api/scores`: valida los datos y guarda una marca si supera la anterior.
 
-Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres.
+Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. La temporada nueva ignora las marcas anteriores para que el tablero empiece limpio.
 
 También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 30 envíos por minuto y añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria es una barrera adicional; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
 

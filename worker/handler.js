@@ -5,6 +5,9 @@ const ALLOWED_ORIGINS = new Set([
 const MAX_SCORE_BODY_BYTES = 2048;
 const SCORE_RATE_WINDOW_MS = 60_000;
 const SCORE_RATE_LIMIT = 30;
+// Nueva temporada: las marcas anteriores quedan fuera del tablero activo.
+// Se conservan en D1 para no hacer una eliminación irreversible desde el Worker.
+const SCOREBOARD_RESET_AT = Date.parse('2026-11-06T16:20:54.803Z');
 const scoreRateBuckets = new Map();
 
 const ASSET_TYPES = {
@@ -58,8 +61,10 @@ function validInteger(value, min, max) {
   return Number.isInteger(value) && value >= min && value <= max;
 }
 
-function scoreFor(level, wpm, accuracy, hp) {
-  return level * 10000 + wpm * 100 + accuracy * 10 + Math.max(0, hp);
+function scoreFor(wpm, accuracy, hp, completed) {
+  const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
+  const raw = Math.round(cappedWpm * 10 + accuracy * 2 + Math.max(0, Math.round(hp)) * 2);
+  return completed ? raw : Math.round(raw * .1);
 }
 
 function scoreClientKey(request) {
@@ -90,9 +95,10 @@ async function readLeaderboard(request, env) {
   const result = await env.DB.prepare(
     `SELECT player_name AS name, level, score, wpm, accuracy
      FROM scores
+     WHERE updated_at >= ?
      ORDER BY score DESC, updated_at ASC
      LIMIT 50`
-  ).all();
+  ).bind(SCOREBOARD_RESET_AT).all();
   return json(request, result.results || []);
 }
 
@@ -120,16 +126,18 @@ async function saveScore(request, env) {
   const wpm = Number(body?.wpm);
   const accuracy = Number(body?.accuracy);
   const hp = Number(body?.hp);
+  const completed = body?.completed === true;
   if (!validName(name) || !validInteger(level, 1, 8) || !validInteger(wpm, 0, 300)
-    || !validInteger(accuracy, 0, 100) || !validInteger(hp, 0, 100)) {
+    || !validInteger(accuracy, 0, 100) || !validInteger(hp, 0, 100)
+    || typeof body?.completed !== 'boolean') {
     return json(request, { error: 'Puntuación inválida.' }, 400);
   }
 
   const normalizedName = normalizeName(name);
-  const score = scoreFor(level, wpm, accuracy, hp);
+  const score = scoreFor(wpm, accuracy, hp, completed);
   const previous = await env.DB.prepare(
-    'SELECT score FROM scores WHERE normalized_name = ? AND level = ?'
-  ).bind(normalizedName, level).first();
+    'SELECT score FROM scores WHERE normalized_name = ? AND level = ? AND updated_at >= ?'
+  ).bind(normalizedName, level, SCOREBOARD_RESET_AT).first();
   if (previous && Number(previous.score) >= score) {
     return json(request, { saved: false, score: Number(previous.score) });
   }

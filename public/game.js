@@ -10,6 +10,7 @@
   const MAX_FRAME_DELTA = 40;
   const MAX_PARTICLES = 96;
   const MAX_FLOATING_TEXT = 12;
+  const SCOREBOARD_VERSION = '2026-11-score-v2';
   const API_BASE = location.hostname.endsWith('github.io')
     ? 'https://desco-keyboard.josuepmvf.chatgpt.site'
     : '';
@@ -524,11 +525,17 @@
     $('bestWpm').textContent = `${localStorage.getItem('desco-keyboard-best') || 0} PPM`;
   }
 
-  function scoreFor(level, wpm, accuracy, hp) {
-    return level * 10000 + wpm * 100 + accuracy * 10 + Math.max(0, Math.round(hp));
+  function scoreFor(wpm, accuracy, hp, completed) {
+    const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
+    const raw = Math.round(cappedWpm * 10 + accuracy * 2 + Math.max(0, Math.round(hp)) * 2);
+    return completed ? raw : Math.round(raw * .1);
   }
 
   function localLeaderboard() {
+    if (localStorage.getItem('desco-keyboard-score-version') !== SCOREBOARD_VERSION) {
+      localStorage.removeItem('desco-keyboard-local-board');
+      localStorage.setItem('desco-keyboard-score-version', SCOREBOARD_VERSION);
+    }
     try { return JSON.parse(localStorage.getItem('desco-keyboard-local-board') || '[]'); }
     catch { return []; }
   }
@@ -596,9 +603,10 @@
       level,
       wpm: getWpm(),
       accuracy: getAccuracy(),
-      hp: Math.round(state.playerHp)
+      hp: Math.round(state.playerHp),
+      completed: Boolean(won)
     };
-    entry.score = scoreFor(entry.level, entry.wpm, entry.accuracy, entry.hp);
+    entry.score = scoreFor(entry.wpm, entry.accuracy, entry.hp, entry.completed);
     saveLocalScore(entry);
     $('scoreSubmitStatus').textContent = `Puntuación: ${entry.score.toLocaleString('es-MX')} · guardando en el tablero global…`;
     try {
