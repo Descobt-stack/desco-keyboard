@@ -11,6 +11,7 @@
   const MAX_PARTICLES = 96;
   const MAX_FLOATING_TEXT = 12;
   const SCOREBOARD_VERSION = '2026-11-score-v3';
+  const DEVICE_ID_STORAGE_KEY = 'desco-keyboard-device-id-v1';
   const TRAINER_STORAGE_KEY = 'desco-keyboard-letter-misses-v1';
   const PHRASE_HISTORY_PREFIX = 'desco-keyboard-phrase-history-v1-';
   const SCORE_PROFILES = [
@@ -26,6 +27,16 @@
   const API_BASE = location.hostname.endsWith('github.io')
     ? 'https://desco-keyboard.josuepmvf.chatgpt.site'
     : '';
+
+  function getDeviceId() {
+    const current = localStorage.getItem(DEVICE_ID_STORAGE_KEY);
+    if (current && /^[a-zA-Z0-9_-]{16,80}$/.test(current)) return current;
+    const next = typeof globalThis.crypto?.randomUUID === 'function'
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(DEVICE_ID_STORAGE_KEY, next);
+    return next;
+  }
   const LETTER_ATTACKS = [
     { type: 'jab', duration: 180, impactAt: .38, y: 365, amount: 4 },
     { type: 'cross', duration: 190, impactAt: .42, y: 350, amount: 5 },
@@ -136,6 +147,7 @@
     mode: 'menu',
     level: 'nivel1',
     playerName: localStorage.getItem('desco-keyboard-player-name') || '',
+    deviceId: getDeviceId(),
     lessons: [],
     wordIndex: 0,
     typed: '',
@@ -678,7 +690,8 @@
     $('resultWpm').textContent = getWpm();
     $('resultAccuracy').textContent = getAccuracy();
     $('resultScore').textContent = finalScore.toLocaleString('es-MX');
-    $('resultGrade').textContent = scoreGrade(finalScore, currentLevel().number);
+    const perfect = won && state.wrongKeys === 0 && getAccuracy() === 100;
+    $('resultGrade').textContent = scoreGrade(finalScore, currentLevel().number, perfect);
     $('resultCombo').textContent = state.bestCombo;
     const best = Number(localStorage.getItem('desco-keyboard-best') || 0);
     if (getWpm() > best) localStorage.setItem('desco-keyboard-best', String(getWpm()));
@@ -719,10 +732,15 @@
     return bandStart + Math.round(bandWidth * weighted);
   }
 
-  function scoreGrade(score, levelNumber) {
+  function scoreGrade(score, levelNumber, perfect = false) {
     const profile = scoreProfile(levelNumber);
+    if (perfect || Number(score) > profile.cap) return 'S+';
     const bandStart = scoreBandStart(levelNumber);
-    const performance = scoreRatio(Number(score) - bandStart, profile.cap - bandStart);
+    // Las marcas históricas pueden estar por debajo de la banda nueva;
+    // las califico con su proporción visible para no hacerlas aparecer todas como D.
+    const performance = Number(score) < bandStart
+      ? scoreRatio(Number(score), profile.cap)
+      : scoreRatio(Number(score) - bandStart, profile.cap - bandStart);
     if (performance >= .9) return 'SS';
     if (performance >= .78) return 'S';
     if (performance >= .65) return 'A';
@@ -747,11 +765,15 @@
 
   function saveLocalScore(entry) {
     const board = localLeaderboard();
-    const same = board.find((item) => item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es')
-      && item.level === entry.level);
+    const same = board.find((item) => item.level === entry.level
+      && (item.deviceId && entry.deviceId
+        ? item.deviceId === entry.deviceId
+        : item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es')));
     if (same && same.score >= entry.score) return board;
-    const next = board.filter((item) => !(item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es')
-      && item.level === entry.level));
+    const next = board.filter((item) => !(item.level === entry.level
+      && (item.deviceId && entry.deviceId
+        ? item.deviceId === entry.deviceId
+        : item.name.toLocaleLowerCase('es') === entry.name.toLocaleLowerCase('es'))));
     next.push(entry);
     next.sort((a, b) => b.score - a.score);
     localStorage.setItem('desco-keyboard-local-board', JSON.stringify(next.slice(0, 20)));
@@ -785,7 +807,7 @@
       score.className = 'leaderboard-score';
       name.textContent = entry.name;
       level.textContent = `N${entry.level}`;
-      grade.textContent = scoreGrade(Number(entry.score), levelNumber);
+      grade.textContent = entry.grade || scoreGrade(Number(entry.score), levelNumber);
       score.textContent = Number(entry.score).toLocaleString('es-MX');
       item.append(name, level, grade, score);
       list.append(item);
@@ -809,6 +831,7 @@
     if (state.scoreSubmitted) return;
     state.scoreSubmitted = true;
     const level = currentLevel().number;
+    const perfect = Boolean(won && state.wrongKeys === 0 && getAccuracy() === 100);
     const entry = {
       name: state.playerName,
       level,
@@ -821,10 +844,12 @@
       durationMs: elapsedMilliseconds(),
       phasesCompleted: won ? state.lessons.length : Math.max(0, state.wave),
       progressPercent: won ? 100 : currentProgressPercent(),
-      bestCombo: state.bestCombo
+      bestCombo: state.bestCombo,
+      deviceId: state.deviceId
     };
     entry.score = scoreFor(entry.level, entry.wpm, entry.accuracy, entry.hp,
       entry.bestCombo, entry.correctKeys, entry.progressPercent, entry.completed);
+    entry.grade = perfect ? 'S+' : scoreGrade(entry.score, level);
     saveLocalScore(entry);
     $('scoreSubmitStatus').textContent = `Puntuación: ${entry.score.toLocaleString('es-MX')} · guardando en el tablero global…`;
     try {
@@ -835,6 +860,12 @@
       });
       if (!response.ok) throw new Error('No se pudo guardar');
       const result = await response.json();
+      if (result.name) entry.name = result.name;
+      if (Number.isFinite(Number(result.score))) entry.score = Number(result.score);
+      entry.grade = result.grade || (perfect ? 'S+' : scoreGrade(entry.score, level));
+      saveLocalScore(entry);
+      $('resultScore').textContent = entry.score.toLocaleString('es-MX');
+      $('resultGrade').textContent = result.grade || scoreGrade(entry.score, level);
       $('scoreSubmitStatus').textContent = `${won ? 'Combate completado' : 'Intento registrado'} · ${result.saved ? 'nueva marca global' : 'conservamos tu mejor marca'}.`;
       await loadLeaderboard();
     } catch {

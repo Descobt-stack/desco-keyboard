@@ -24,6 +24,8 @@ Aquí configuré los ocho niveles. Cada nivel define:
 - cinco temas con diez frases cada uno;
 - diez fases jugables en los niveles 1–4 y dieciséis en los niveles 5–8.
 
+En los temas regionales incorporé palabras de México, Colombia, Argentina y España. En los niveles bajos aparecen sin acentos ni signos para que la práctica inicial no se vuelva una prueba ortográfica; en los niveles altos mezclo acentos, puntuación y vocabulario de distintas variantes del español.
+
 Uso `buildSection()` para combinar partes gramaticales compatibles. Al cargar el archivo verifico que cada nivel tenga exactamente 50 frases.
 
 ### `public/game.js`
@@ -66,7 +68,9 @@ Yo separé la puntuación por nivel para que el tablero solo compare a quienes j
 
 La marca combina cinco señales: 25% de velocidad (PPM), 25% de precisión, 20% de letras correctas, 15% del mejor combo y 15% de vida restante. Cada señal se compara con la meta propia del nivel y queda limitada al 100%, así que escribir más rápido no genera cifras gigantes.
 
-Para que una campaña completada de mayor dificultad siempre tenga más valor que una campaña inferior, cada nivel ocupa una banda sin solaparse. El nivel 1 ocupa de 0 a 650; el nivel 2 empieza en 651; el nivel 3 en 726, y así sucesivamente. Dentro de su banda, la calificación depende de mis métricas: D, C, B, A, S o SS. Una marca perfecta alcanza el límite de su nivel.
+Para que una campaña completada de mayor dificultad siempre tenga más valor que una campaña inferior, cada nivel ocupa una banda sin solaparse. El nivel 1 ocupa de 0 a 650; el nivel 2 empieza en 651; el nivel 3 en 726, y así sucesivamente. Dentro de su banda, la calificación depende de mis métricas: D, C, B, A, S, SS o S+. Una marca perfecta sin errores recibe S+ y supera por un punto la marca líder de ese nivel; así el récord puede seguir creciendo con la práctica.
+
+Cuando recupero una marca histórica que todavía está debajo de la banda nueva, calculo su letra con la proporción visible de sus puntos para conservar una calificación útil en el tablero.
 
 Si completo todas las fases guardo el resultado de esa banda. Si pierdo o abandono, calculo lo que llevaba según el avance de la fase y conservo solo el 10%. El navegador y el Worker repiten la misma fórmula; el servidor no confía en la puntuación enviada por el navegador.
 
@@ -77,7 +81,7 @@ Aquí serví el juego y creé dos rutas:
 - `GET /api/leaderboard?level=3`: devuelve las 50 mejores marcas del nivel solicitado. Si no indico nivel, mantiene la consulta general para compatibilidad.
 - `POST /api/scores`: valida los datos y guarda una marca si supera la anterior.
 
-Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. La combinación de jugador y nivel es independiente: una marca del nivel 1 no ocupa el lugar de una marca del nivel 4. La temporada nueva ignora las marcas anteriores para que el tablero empiece limpio.
+Normalizo el nombre para evitar duplicados por mayúsculas y acentos. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres. También genero una identidad estable por dispositivo. La primera sesión que vuelve a usar un nombre histórico conserva su fila; si otro dispositivo usa el mismo nombre, guardo un sufijo visible como `Josue (2)`. La combinación de dispositivo, jugador y nivel es independiente: una marca del nivel 1 no ocupa el lugar de una marca del nivel 4. Las marcas históricas permanecen en el tablero.
 
 También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 10 envíos por minuto y vuelvo a calcular PPM, precisión y fases terminadas a partir de las métricas enviadas. Añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria y la validación cruzada son barreras adicionales; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
 

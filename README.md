@@ -18,6 +18,9 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - Tablero global con nombre, nivel y mejor puntuación por jugador.
 - Puntuación independiente por nivel: el nivel 1 llega a 650 puntos y los siguientes a 725, 800, 875, 950, 1025, 1100 y 1175; las bandas no se solapan.
 - La marca combina velocidad, precisión, letras correctas, combo y vida. Una campaña completa conserva el resultado de su banda; una incompleta solo el 10% de lo obtenido hasta su avance.
+- Una campaña perfecta sin errores recibe S+ y supera por un punto la marca líder de ese nivel, para que el récord siga avanzando con la práctica.
+- El tablero conserva las marcas anteriores. Si dos equipos usan el mismo nombre, el segundo recibe un sufijo visible, como `Josue (2)`, sin borrar al primero.
+- El vocabulario mezcla expresiones de México, Colombia, Argentina y España; la mezcla crece en los niveles avanzados.
 - Pausa manual y automática al cambiar de pestaña.
 - Tema oscuro y claro, sonido Web Audio, PPM, precisión, rango, combo y salud.
 - Interfaz ajustada para laptop; el trabajo específico para móviles queda fuera de esta fase.

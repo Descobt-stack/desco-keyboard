@@ -30,7 +30,7 @@
       ['Postura', ['Mi espalda', 'La postura'], ['mantiene', 'busca'], ['una forma recta al practicar', 'los hombros sueltos al escribir', 'el cuerpo comodo frente al teclado']],
       ['Mano izquierda', ['La mano izquierda', 'Cada dedo izquierdo'], ['practica', 'repite'], ['movimientos cortos y seguros', 'las teclas de su zona', 'un ritmo lento sin saltos']],
       ['Mano derecha', ['La mano derecha', 'Cada dedo derecho'], ['mantiene', 'aprende'], ['un ritmo parejo y simple', 'su camino sobre las teclas', 'movimientos suaves al volver']],
-      ['Practica diaria', ['Mi practica diaria', 'Cada ronda corta'], ['me ayuda a', 'permite'], ['escribir mejor cada dia', 'ganar control poco a poco', 'formar un buen habito']]
+      ['Voces cercanas', ['Mi compa', 'El parce'], ['practica', 'escribe'], ['con calma cada dia', 'junto al teclado', 'con un mate al lado']]
     ]),
 
     nivel2: buildLevel({
@@ -42,7 +42,7 @@
       ['Lectura simple', ['Mi vista', 'La lectura de la frase'], ['sigue', 'anticipa'], ['la palabra que debo escribir', 'el siguiente grupo de letras', 'el orden correcto sin mirar mis manos']],
       ['Espacio y retorno', ['Mi pulgar', 'La barra de espacio'], ['marca', 'separa'], ['cada palabra de forma clara', 'el final de cada intento', 'las ideas dentro de la frase']],
       ['Ritmo estable', ['Un ritmo estable', 'La velocidad constante'], ['me permite', 'ayuda a'], ['conservar la precision', 'terminar sin perder el control', 'reducir pausas entre palabras']],
-      ['Confianza', ['Cada frase correcta', 'El trabajo constante'], ['aumenta', 'me da'], ['confianza para seguir', 'seguridad frente al teclado', 'una base firme para avanzar']]
+      ['Rutas del idioma', ['La chamba', 'El ordenador'], ['me ayuda a', 'permite'], ['ganar ritmo sin prisa', 'mantener la mano firme', 'seguir el texto completo']]
     ]),
 
     nivel3: buildLevel({
@@ -54,7 +54,7 @@
       ['Lectura previa', ['La lectura previa', 'Mirar hacia adelante'], ['prepara', 'ordena'], ['mis dedos para la siguiente palabra', 'el ritmo antes de escribir', 'la ruta que sigue la frase']],
       ['Trabajo diario', ['El mensaje de trabajo', 'Un reporte sencillo'], ['debe mostrar', 'puede explicar'], ['datos claros para el equipo', 'el problema sin rodeos', 'una idea completa y ordenada']],
       ['Tecnologia', ['La computadora', 'Cada programa'], ['procesa', 'guarda'], ['la informacion de forma segura', 'los cambios antes de cerrar', 'el trabajo que hago durante el dia']],
-      ['Continuidad', ['La practica constante', 'Un buen entrenamiento'], ['convierte', 'mantiene'], ['los movimientos en algo natural', 'la mente atenta durante la ronda', 'el avance sin perder precision']]
+      ['Vocabulario regional', ['Un pibe', 'Un parcero'], ['escribe', 'revisa'], ['cada frase con cuidado', 'un mensaje de trabajo', 'las teclas de su zona']]
     ]),
 
     nivel4: buildLevel({
@@ -66,7 +66,7 @@
       ['Concentracion', ['La mente tranquila', 'Mi atencion constante'], ['mantiene', 'protege'], ['el ritmo aun con palabras nuevas', 'la precision durante toda la frase', 'el orden de los movimientos']],
       ['Memoria muscular', ['La memoria muscular', 'La practica repetida'], ['fortalece', 'convierte'], ['cada ruta sobre el teclado', 'los movimientos lentos en reflejos', 'la posicion correcta de los dedos']],
       ['Resolucion', ['Un problema complejo', 'Cada tarea pendiente'], ['se resuelve con', 'necesita'], ['pasos claros y verificables', 'paciencia antes de actuar', 'un plan simple para avanzar']],
-      ['Fluidez final', ['Mi escritura fluida', 'Una sesion completa'], ['combina', 'demuestra'], ['velocidad con buen control', 'avance sin descuidar la precision', 'confianza para subir de nivel']]
+      ['Mezcla hispana', ['El teclado', 'La computadora'], ['recibe', 'procesa'], ['palabras de Mexico y Colombia', 'voces de Argentina y Espana', 'un texto claro para todos']]
     ]),
 
     nivel5: buildLevel({
@@ -78,7 +78,7 @@
       ['Ortografía', ['La ortografía clara', 'Cada término difícil'], ['me obliga a', 'ayuda a'], ['recordar dónde va el acento', 'revisar la palabra antes de seguir', 'mantener el significado correcto']],
       ['Comunicación', ['La comunicación escrita', 'Un mensaje útil'], ['necesita', 'mantiene'], ['claridad desde la primera línea', 'un tono amable y directo', 'información fácil de comprender']],
       ['Tecnología', ['La tecnología moderna', 'Una aplicación rápida'], ['permite', 'requiere'], ['resolver tareas con precisión', 'una configuración lógica y segura', 'atención durante cada actualización']],
-      ['Evolución', ['Mi evolución', 'La repetición consciente'], ['será visible al', 'consigue'], ['terminar varias frases correctas', 'convertir el esfuerzo en habilidad', 'mejorar la coordinación de mis manos']]
+      ['Vocabulario de América', ['La práctica del parce', 'El mate argentino'], ['me recuerda', 'acompaña'], ['que la precisión une distintas regiones', 'a escribir con calma y atención', 'a reconocer cada expresión']]
     ]),
 
     nivel6: buildLevel({
@@ -88,7 +88,7 @@
     }, [
       ['Precisión técnica', ['La precisión técnica', 'Un análisis confiable'], ['exige', 'combina'], ['evidencia útil con decisiones claras', 'atención y método durante el proceso', 'información válida para el diagnóstico']],
       ['Ingeniería', ['La ingeniería de software', 'Cada solución robusta'], ['organiza', 'equilibra'], ['módulos fáciles de mantener', 'rendimiento seguridad y claridad', 'responsabilidades dentro del sistema']],
-      ['Colaboración', ['La colaboración efectiva', 'Un equipo autónomo'], ['comparte', 'documenta'], ['conocimientos que ayudan a todos', 'decisiones para evitar confusiones', 'el propósito de cada cambio']],
+      ['Registros hispanos', ['Un mensaje colombiano', 'Una nota argentina'], ['combina', 'conserva'], ['palabras locales con claridad técnica', 'el tono de cada región', 'la intención sin perder precisión']],
       ['Diagnóstico', ['El diagnóstico correcto', 'Una revisión metódica'], ['reduce', 'permite'], ['el tiempo necesario de reparación', 'detectar fallas difíciles de reproducir', 'encontrar la causa antes de cambiar algo']],
       ['Dominio de acentos', ['El dominio ortográfico', 'Mi práctica avanzada'], ['mantiene', 'demuestra'], ['los acentos incluso al acelerar', 'calidad en palabras poco comunes', 'coordinación bajo mayor presión']]
     ]),
@@ -102,7 +102,7 @@
       ['Listas breves', ['El sistema incluye', 'La práctica combina'], ['tres elementos:', 'varias habilidades:'], ['precisión, ritmo y memoria', 'lectura, control y velocidad', 'acentos, signos y correcciones'], '.'],
       ['Decisiones', ['Si aparece un error,', 'Cuando una palabra es difícil,'], ['respiro y', 'corrijo con calma y'], ['continúo sin perder el orden', 'recupero el ritmo de la frase', 'vuelvo a la posición correcta'], '.'],
       ['Preguntas', ['¿Puedo mantener el ritmo si', '¿Qué sucede cuando'], ['aumenta', 'cambia'], ['la dificultad de la sesión?', 'la longitud de la frase?', 'el tipo de puntuación?'], ''],
-      ['Redacción precisa', ['Una explicación clara;', 'Un reporte completo;'], ['separa', 'conecta'], ['los hechos, las causas y la solución', 'la evidencia, el impacto y la acción', 'cada sección sin perder contexto'], '.']
+      ['Variedades del español', ['En Colombia,', 'En Argentina,'], ['aparecen', 'se escuchan'], ['parce, arepa y palabras locales', 'mate, che y expresiones propias', 'voces distintas en una misma frase'], '.']
     ]),
 
     nivel8: buildLevel({
@@ -114,7 +114,7 @@
       ['Producción', ['Antes del despliegue,', 'Después de publicar,'], ['el equipo verifica', 'la revisión confirma'], ['métricas, registros y rutas críticas', 'que la versión responda como se esperaba', 'los resultados; luego documenta lo aprendido'], '.'],
       ['Comunicación técnica', ['Una conclusión sólida', 'La documentación útil'], ['distingue con precisión', 'explica sin ambigüedad'], ['hechos, hipótesis y recomendaciones', 'qué cambió, por qué y para quién', 'el problema; después propone una solución'], '.'],
       ['Reto de lectura', ['¿Mantendrás la precisión cuando', '¿Podrás corregir sin detenerte si'], ['aparezcan', 'se mezclan'], ['acentos, comas y palabras extensas?', 'preguntas, pausas y signos distintos?', 'términos técnicos y frases complejas?'], ''],
-      ['Combate final', ['La excelencia no depende de un intento;', 'El dominio verdadero aparece cuando'], ['se construye al', 'combina'], ['repetir resultados con velocidad y precisión', 'disciplina, técnica y adaptación inmediata', 'lectura anticipada, control y confianza'], '.']
+      ['Mezcla final', ['La práctica colombiana,', 'El ritmo argentino,'], ['combina', 'reúne'], ['parce, arepa y precisión técnica', 'mate, che y velocidad constante', 'vocabulario de México, España y todo el idioma'], '.']
     ])
   };
 })();

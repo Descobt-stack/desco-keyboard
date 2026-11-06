@@ -8,6 +8,7 @@ const SCORE_RATE_LIMIT = 10;
 const MAX_SCORE_DURATION_MS = 6 * 60 * 60 * 1000;
 const MAX_SCORE_KEYS = 20_000;
 const MAX_SCORE_COMBO = 2_000;
+const MAX_DEVICE_ID_LENGTH = 80;
 const SCORE_PROFILES = [
   { cap: 650, targetWpm: 20, letterTarget: 400, comboTarget: 50 },
   { cap: 725, targetWpm: 25, letterTarget: 440, comboTarget: 50 },
@@ -18,9 +19,8 @@ const SCORE_PROFILES = [
   { cap: 1100, targetWpm: 65, letterTarget: 840, comboTarget: 100 },
   { cap: 1175, targetWpm: 78, letterTarget: 1100, comboTarget: 120 }
 ];
-// Nueva temporada de puntuación: las marcas anteriores quedan fuera del tablero activo.
-// Se conservan en D1 para no hacer una eliminación irreversible desde el Worker.
-const SCOREBOARD_RESET_AT = Date.parse('2026-11-06T18:17:39.555Z');
+// Mantengo las marcas históricas. La puntuación nueva se agrega sobre el mismo tablero.
+const SCOREBOARD_RESET_AT = 0;
 const scoreRateBuckets = new Map();
 
 const ASSET_TYPES = {
@@ -63,7 +63,8 @@ function json(request, value, status = 200) {
 }
 
 function normalizeName(name) {
-  return name.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('es');
+  return name.normalize('NFKD').replace(/\p{M}/gu, '').normalize('NFKC')
+    .trim().replace(/\s+/g, ' ').toLocaleLowerCase('es');
 }
 
 function validName(name) {
@@ -72,6 +73,13 @@ function validName(name) {
 
 function validInteger(value, min, max) {
   return Number.isInteger(value) && value >= min && value <= max;
+}
+
+function validDeviceId(value) {
+  return typeof value === 'string'
+    && value.length >= 16
+    && value.length <= MAX_DEVICE_ID_LENGTH
+    && /^[a-zA-Z0-9_-]+$/.test(value);
 }
 
 function scoreProfile(level) {
@@ -87,6 +95,21 @@ function scoreRatio(value, target) {
   return Math.max(0, Math.min(1, Number(value) / Math.max(1, target)));
 }
 
+function scoreGrade(score, level, perfect = false) {
+  const profile = scoreProfile(level);
+  if (perfect || Number(score) > profile.cap) return 'S+';
+  const bandStart = scoreBandStart(level);
+  const performance = Number(score) < bandStart
+    ? scoreRatio(Number(score), profile.cap)
+    : scoreRatio(Number(score) - bandStart, profile.cap - bandStart);
+  if (performance >= .9) return 'SS';
+  if (performance >= .78) return 'S';
+  if (performance >= .65) return 'A';
+  if (performance >= .52) return 'B';
+  if (performance >= .38) return 'C';
+  return 'D';
+}
+
 function scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed) {
   const profile = scoreProfile(level);
   const cappedWpm = Math.min(200, Math.max(0, Math.round(wpm)));
@@ -100,6 +123,11 @@ function scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPerc
   const bandStart = scoreBandStart(level);
   const bandWidth = Math.max(1, profile.cap - bandStart);
   return bandStart + Math.round(bandWidth * weighted);
+}
+
+function isPerfectRun(completed, accuracy, wrongKeys, progressPercent, phasesCompleted, level) {
+  return completed && accuracy === 100 && wrongKeys === 0
+    && progressPercent === 100 && phasesCompleted === phaseCountForLevel(level);
 }
 
 function phaseCountForLevel(level) {
@@ -160,7 +188,50 @@ async function readLeaderboard(request, env) {
        ORDER BY score DESC, updated_at ASC
        LIMIT 50`
     ).bind(SCOREBOARD_RESET_AT).all();
-  return json(request, result.results || []);
+  return json(request, (result.results || []).map((entry) => ({
+    ...entry,
+    grade: scoreGrade(Number(entry.score), Number(entry.level))
+  })));
+}
+
+async function resolvePlayerIdentity(env, level, name, normalizedName, deviceId) {
+  const deviceKey = `${normalizedName}::${deviceId}`;
+  const result = await env.DB.prepare(
+    `SELECT id, player_name, normalized_name, score
+     FROM scores
+     WHERE level = ? AND (normalized_name = ? OR normalized_name LIKE ?)`
+  ).bind(level, normalizedName, `${normalizedName}::%`).all();
+  const rows = result.results || [];
+  const sameDevice = rows.find((row) => row.normalized_name === deviceKey);
+  if (sameDevice) {
+    return { key: deviceKey, displayName: sameDevice.player_name, legacyId: null };
+  }
+
+  // La primera sesión que vuelva a usar un nombre histórico reclama esa fila.
+  // Así conservo la marca existente sin crear un duplicado para el mismo jugador.
+  const legacy = rows.find((row) => row.normalized_name === normalizedName);
+  if (legacy) {
+    return { key: deviceKey, displayName: name, legacyId: Number(legacy.id) };
+  }
+
+  const usedNames = new Set(rows.map((row) => String(row.player_name)));
+  const normalizedDisplay = (value) => normalizeName(value);
+  const baseIsUsed = rows.some((row) => normalizedDisplay(row.player_name) === normalizedName);
+  let displayName = name;
+  if (baseIsUsed || usedNames.has(name)) {
+    let suffix = 2;
+    while (usedNames.has(`${name} (${suffix})`)
+      || rows.some((row) => normalizedDisplay(row.player_name) === normalizedDisplay(`${name} (${suffix})`))) {
+      suffix += 1;
+    }
+    displayName = `${name} (${suffix})`;
+  }
+  return { key: deviceKey, displayName, legacyId: null };
+}
+
+async function topScoreForLevel(env, level) {
+  const result = await env.DB.prepare('SELECT MAX(score) AS score FROM scores WHERE level = ?').bind(level).first();
+  return Number(result?.score || 0);
 }
 
 async function saveScore(request, env) {
@@ -194,6 +265,7 @@ async function saveScore(request, env) {
   const phasesCompleted = Number(body?.phasesCompleted);
   const progressPercent = Number(body?.progressPercent);
   const bestCombo = Number(body?.bestCombo);
+  const deviceId = typeof body?.deviceId === 'string' ? body.deviceId : '';
   if (!validName(name) || !validInteger(level, 1, 8) || !validInteger(wpm, 0, 300)
     || !validInteger(accuracy, 0, 100) || !validInteger(hp, 0, 100)
     || typeof body?.completed !== 'boolean'
@@ -202,7 +274,8 @@ async function saveScore(request, env) {
     || !validInteger(durationMs, 1000, MAX_SCORE_DURATION_MS)
     || !validInteger(phasesCompleted, 0, phaseCountForLevel(level))
     || !validInteger(progressPercent, 0, 100)
-    || !validInteger(bestCombo, 0, MAX_SCORE_COMBO)) {
+    || !validInteger(bestCombo, 0, MAX_SCORE_COMBO)
+    || !validDeviceId(deviceId)) {
     return json(request, { error: 'Puntuación inválida.' }, 400);
   }
 
@@ -218,12 +291,31 @@ async function saveScore(request, env) {
   }
 
   const normalizedName = normalizeName(name);
-  const score = scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed);
-  const previous = await env.DB.prepare(
-    'SELECT score FROM scores WHERE normalized_name = ? AND level = ? AND updated_at >= ?'
-  ).bind(normalizedName, level, SCOREBOARD_RESET_AT).first();
+  const identity = await resolvePlayerIdentity(env, level, name, normalizedName, deviceId);
+  const previous = identity.legacyId
+    ? await env.DB.prepare('SELECT score FROM scores WHERE id = ?').bind(identity.legacyId).first()
+    : await env.DB.prepare(
+      'SELECT score FROM scores WHERE normalized_name = ? AND level = ? AND updated_at >= ?'
+    ).bind(identity.key, level, SCOREBOARD_RESET_AT).first();
+
+  if (identity.legacyId) {
+    await env.DB.prepare(
+      'UPDATE scores SET player_name = ?, normalized_name = ? WHERE id = ? AND normalized_name = ?'
+    ).bind(identity.displayName, identity.key, identity.legacyId, normalizedName).run();
+  }
+
+  const perfect = isPerfectRun(completed, accuracy, wrongKeys, progressPercent, phasesCompleted, level);
+  const baseScore = scoreFor(level, wpm, accuracy, hp, bestCombo, correctKeys, progressPercent, completed);
+  const score = perfect
+    ? Math.max(baseScore, (await topScoreForLevel(env, level)) + 1, scoreProfile(level).cap + 1)
+    : baseScore;
   if (previous && Number(previous.score) >= score) {
-    return json(request, { saved: false, score: Number(previous.score) });
+    return json(request, {
+      saved: false,
+      name: identity.displayName,
+      score: Number(previous.score),
+      grade: scoreGrade(Number(previous.score), level, perfect)
+    });
   }
 
   const now = Date.now();
@@ -238,8 +330,8 @@ async function saveScore(request, env) {
        accuracy = excluded.accuracy,
        hp = excluded.hp,
        updated_at = excluded.updated_at`
-  ).bind(name, normalizedName, level, score, wpm, accuracy, hp, now, now).run();
-  return json(request, { saved: true, score }, 201);
+  ).bind(identity.displayName, identity.key, level, score, wpm, accuracy, hp, now, now).run();
+  return json(request, { saved: true, name: identity.displayName, score, grade: scoreGrade(score, level, perfect) }, 201);
 }
 
 function serveAsset(request, pathname) {
