@@ -12,6 +12,8 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - Curación por frases limpias. En niveles altos necesito completar más frases correctas para recuperar vida.
 - Cinco golpes diferentes por letra: jab, cruzado, gancho, uppercut y rodillazo.
 - Cola de animaciones: aunque escriba rápido, ninguna letra pierde su movimiento.
+- Rig 2D articulado con cuello, hombros, codos y rodillas; el punto visual de contacto coincide con el impacto.
+- Rival con movimiento autónomo y defensa automática mientras aún queda tiempo para escribir.
 - Golpe fuerte o patada al terminar una palabra.
 - Tablero global con nombre, nivel y mejor puntuación por jugador.
 - Pausa manual y automática al cambiar de pestaña.
@@ -23,7 +25,7 @@ Construí Desco Keyboard como un juego público de mecanografía en español. Ca
 - `public/index.html`: estructura visible, menú, ocho niveles, tablero y accesibilidad.
 - `public/styles.css`: diseño adaptable, frases multilínea y estilos del tablero.
 - `public/phrases.js`: reglas y generador de 400 frases.
-- `public/game.js`: mecanografía, combate, curación, puntuación, audio y Canvas.
+- `public/game.js`: mecanografía, combate, rig articulado, defensa autónoma, curación, puntuación, audio y Canvas.
 - `worker/handler.js`: API del tablero global y entrega de los archivos del juego.
 - `db/schema.ts`: definición del tablero para D1.
 - `drizzle/`: migración versionada de la base de datos.

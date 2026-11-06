@@ -2,6 +2,10 @@ const ALLOWED_ORIGINS = new Set([
   'https://descobt-stack.github.io',
   'https://desco-keyboard.josuepmvf.chatgpt.site'
 ]);
+const MAX_SCORE_BODY_BYTES = 2048;
+const SCORE_RATE_WINDOW_MS = 60_000;
+const SCORE_RATE_LIMIT = 30;
+const scoreRateBuckets = new Map();
 
 const ASSET_TYPES = {
   '/index.html': 'text/html; charset=utf-8',
@@ -28,6 +32,9 @@ function baseHeaders(request, contentType = 'application/json; charset=utf-8') {
     'x-content-type-options': 'nosniff',
     'referrer-policy': 'strict-origin-when-cross-origin',
     'x-frame-options': 'SAMEORIGIN',
+    'cross-origin-resource-policy': 'same-origin',
+    'permissions-policy': 'camera=(), geolocation=(), microphone=()',
+    'content-security-policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' https://desco-keyboard.josuepmvf.chatgpt.site; base-uri 'none'; frame-ancestors 'self'; form-action 'self'",
     ...(origin ? { 'access-control-allow-origin': origin, vary: 'Origin' } : {})
   };
 }
@@ -55,6 +62,29 @@ function scoreFor(level, wpm, accuracy, hp) {
   return level * 10000 + wpm * 100 + accuracy * 10 + Math.max(0, hp);
 }
 
+function scoreClientKey(request) {
+  return request.headers.get('cf-connecting-ip')
+    || request.headers.get('x-forwarded-for')
+    || 'unknown';
+}
+
+function rateLimited(request) {
+  const now = Date.now();
+  const key = scoreClientKey(request);
+  const bucket = scoreRateBuckets.get(key);
+  if (!bucket || now - bucket.startedAt >= SCORE_RATE_WINDOW_MS) {
+    scoreRateBuckets.set(key, { startedAt: now, count: 1 });
+    if (scoreRateBuckets.size > 1000) {
+      for (const [candidate, value] of scoreRateBuckets) {
+        if (now - value.startedAt >= SCORE_RATE_WINDOW_MS) scoreRateBuckets.delete(candidate);
+      }
+    }
+    return false;
+  }
+  bucket.count += 1;
+  return bucket.count > SCORE_RATE_LIMIT;
+}
+
 async function readLeaderboard(request, env) {
   if (!env.DB) return json(request, { error: 'Base de datos no disponible.' }, 503);
   const result = await env.DB.prepare(
@@ -68,7 +98,23 @@ async function readLeaderboard(request, env) {
 
 async function saveScore(request, env) {
   if (!env.DB) return json(request, { error: 'Base de datos no disponible.' }, 503);
-  const body = await request.json();
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
+    return json(request, { error: 'El tablero espera JSON.' }, 415);
+  }
+  const declaredLength = Number(request.headers.get('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > MAX_SCORE_BODY_BYTES) {
+    return json(request, { error: 'La puntuación supera el tamaño permitido.' }, 413);
+  }
+  const raw = await request.text();
+  if (new TextEncoder().encode(raw).byteLength > MAX_SCORE_BODY_BYTES) {
+    return json(request, { error: 'La puntuación supera el tamaño permitido.' }, 413);
+  }
+  let body;
+  try {
+    body = JSON.parse(raw || '{}');
+  } catch {
+    return json(request, { error: 'JSON inválido.' }, 400);
+  }
   const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
   const level = Number(body?.level);
   const wpm = Number(body?.wpm);
@@ -121,6 +167,9 @@ export default {
     const url = new URL(request.url);
     const origin = requestOrigin(request);
     if (origin === false) return json(request, { error: 'Origen no permitido.' }, 403);
+    if (url.pathname === '/api/scores' && request.method === 'POST' && origin === null) {
+      return json(request, { error: 'Se requiere un origen válido.' }, 403);
+    }
 
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -138,6 +187,7 @@ export default {
         return await readLeaderboard(request, env);
       }
       if (url.pathname === '/api/scores' && request.method === 'POST') {
+        if (rateLimited(request)) return json(request, { error: 'Demasiados intentos. Espera un minuto.' }, 429);
         return await saveScore(request, env);
       }
       if (request.method === 'GET' || request.method === 'HEAD') {

@@ -49,7 +49,9 @@ Este es mi motor principal. `state` guarda toda la partida: nivel, nombre, frase
 
 `queuePlayerAction()` guarda todas las acciones. `startNextPlayerAction()` inicia la siguiente únicamente cuando termina la actual. Si escribo muy rápido, reduzco un poco la duración mínima, pero nunca elimino la animación.
 
-`drawStickman()` calcula articulaciones según el tipo de acción. Divido cada golpe en preparación, contacto y recuperación mediante curvas suaves. `updateCombat()` espera el porcentaje `impactAt`; en ese instante muestra partículas, sacude la cámara y activa la reacción del enemigo. Eso mantiene el puño o la pierna sincronizados con el daño.
+En esta fase dejé de mover cada parte con coordenadas independientes. `COMBAT_CLIPS` describe poses de preparación, contacto y recuperación; `sampleCombatClip()` interpola esas poses; `solveCombatTwoBone()` calcula el codo o la rodilla entre dos puntos. `drawStickman()` arma cadera, hombros, cuello, cabeza, brazos y piernas con ese rig. Por eso el puño, la rodilla y el rival terminan en el mismo punto visual donde el juego registra el impacto. La bandana se dibuja como accesorio clásico, sin luces LED ni sombras de neón.
+
+El enemigo también tiene un pequeño pensamiento autónomo: `enemyNextThinkAt` programa ataques espaciados. `enemyAttack('ai')` decide en el momento del ataque si todavía queda tiempo para la palabra. Si queda, `block` muestra la cobertura y no descuenta vida; si no queda, `hit` sincroniza el retroceso y el daño. El reloj de escritura sigue siendo independiente del reloj de animación.
 
 ## Cómo hice la curación
 
@@ -74,6 +76,8 @@ Aquí serví el juego y creé dos rutas:
 
 Normalizo el nombre para evitar duplicados por mayúsculas. Solo permito letras, números, espacios, punto, guion y guion bajo, con un máximo de 20 caracteres.
 
+También exijo un origen permitido para enviar marcas, acepto únicamente JSON, corto el cuerpo a 2 KB, aplico un límite básico de 30 envíos por minuto y añado CSP, `nosniff`, `SAMEORIGIN`, `referrer-policy` y `permissions-policy`. El límite en memoria es una barrera adicional; la verificación fuerte contra trampas sigue siendo una fase futura con sesión o firma.
+
 ## Base de datos
 
 En `db/schema.ts` describí la tabla `scores`. La combinación `normalized_name + level` es única. En `drizzle/` guardo la migración generada y su historial; no creo tablas dentro de una visita del jugador.
@@ -88,7 +92,9 @@ GitHub Pages publica la carpeta `public`. El sitio con base de datos publica el 
 
 - Quiero nuevas frases: `public/phrases.js`.
 - Quiero ajustar tiempos, daño o curación: configuración de cada nivel en `public/phrases.js`.
-- Quiero otro golpe: `LETTER_ATTACKS` y `drawStickman()` en `public/game.js`.
+- Quiero otro golpe: `LETTER_ATTACKS` y una pose dentro de `COMBAT_CLIPS` en `public/game.js`.
+- Quiero cambiar la postura o el punto de contacto: la pose correspondiente en `COMBAT_CLIPS`; `drawStickman()` solo dibuja el rig.
+- Quiero ajustar la defensa autónoma: `enemyNextThinkAt`, `enemyAttack()` y `updateCombat()`.
 - Quiero mover el HUD o mejorar el salto de línea: `public/styles.css`.
 - Quiero cambiar la puntuación: `scoreFor()` en `public/game.js` y `worker/handler.js`.
 - Quiero otra columna global: `db/schema.ts`, una nueva migración y las consultas del Worker.

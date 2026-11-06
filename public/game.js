@@ -23,6 +23,80 @@
   const PLAYER_ATTACK_TYPES = new Set([
     'jab', 'cross', 'hook', 'uppercut', 'knee', 'heavy', 'kick'
   ]);
+  // Fase de combate articulado: cada clip interpola una pose de cadera,
+  // hombros, manos y pies. El personaje se dibuja con IK de dos huesos para
+  // que el puño o la pierna siempre terminen donde se espera el impacto.
+  const COMBAT_POSE_BASE = {
+    crouch: 0, lean: 0, bob: 0, rootShift: 0, headTilt: 0,
+    frontHand: { x: 45, y: 8 }, rearHand: { x: 24, y: -3 },
+    frontFoot: { x: 38, y: 92 }, rearFoot: { x: -38, y: 92 },
+    frontBend: 1, rearBend: -1, frontKnee: 1, rearKnee: 1
+  };
+
+  const combatPose = (overrides = {}) => ({ ...COMBAT_POSE_BASE, ...overrides });
+  const combatPoint = (x, y) => ({ x, y });
+  const mixCombatPoint = (a, b, amount) => combatPoint(
+    a.x + (b.x - a.x) * amount,
+    a.y + (b.y - a.y) * amount
+  );
+  const smoothCombat = (value) => {
+    const t = Math.min(1, Math.max(0, value));
+    return t * t * (3 - 2 * t);
+  };
+  const COMBAT_CLIPS = {
+    jab: { frames: [[0, combatPose()], [.18, combatPose({ crouch: 8, rootShift: -14, frontHand: combatPoint(26, 4), rearHand: combatPoint(18, -8) })], [.38, combatPose({ lean: 7, rootShift: 320, frontHand: combatPoint(124, -2), rearHand: combatPoint(18, -8) })], [.68, combatPose({ rootShift: 208, frontHand: combatPoint(72, 2) })], [1, combatPose()]] },
+    cross: { frames: [[0, combatPose()], [.2, combatPose({ crouch: 7, rootShift: -16, frontHand: combatPoint(33, -10), rearHand: combatPoint(-8, 4) })], [.42, combatPose({ lean: 11, rootShift: 322, frontHand: combatPoint(30, -8), rearHand: combatPoint(126, -4), rearBend: 1 })], [.72, combatPose({ rootShift: 210, rearHand: combatPoint(65, 2), rearBend: 1 })], [1, combatPose()]] },
+    hook: { frames: [[0, combatPose()], [.22, combatPose({ crouch: 12, lean: -6, rootShift: -12, frontHand: combatPoint(18, -25), frontBend: -1 })], [.48, combatPose({ lean: 13, rootShift: 318, frontHand: combatPoint(104, -22), frontBend: -1, rearHand: combatPoint(14, -10) })], [.74, combatPose({ rootShift: 202, frontHand: combatPoint(60, -10), frontBend: -1 })], [1, combatPose()]] },
+    uppercut: { frames: [[0, combatPose()], [.25, combatPose({ crouch: 24, lean: -9, rootShift: 2, frontHand: combatPoint(24, 30), rearHand: combatPoint(10, -8) })], [.52, combatPose({ crouch: 5, lean: 12, rootShift: 320, frontHand: combatPoint(78, -68), frontBend: -1 })], [.76, combatPose({ rootShift: 205, frontHand: combatPoint(55, -25), frontBend: -1 })], [1, combatPose()]] },
+    knee: { frames: [[0, combatPose()], [.2, combatPose({ crouch: 12, lean: -10, rootShift: -8, frontFoot: combatPoint(20, 54), frontKnee: -1, frontHand: combatPoint(28, -12) })], [.5, combatPose({ lean: -15, rootShift: 314, frontFoot: combatPoint(112, 18), frontKnee: -1, frontHand: combatPoint(18, -14), rearHand: combatPoint(-2, -5) })], [.78, combatPose({ lean: -7, rootShift: 198, frontFoot: combatPoint(65, 66), frontKnee: -1 })], [1, combatPose()]] },
+    heavy: { frames: [[0, combatPose()], [.22, combatPose({ crouch: 15, lean: -5, rootShift: -10, frontHand: combatPoint(16, -18), frontBend: -1 })], [.47, combatPose({ lean: 15, rootShift: 306, frontHand: combatPoint(112, -5), frontBend: -1, rearHand: combatPoint(6, -12) })], [.74, combatPose({ rootShift: 190, frontHand: combatPoint(64, -2), frontBend: -1 })], [1, combatPose()]] },
+    kick: { frames: [[0, combatPose()], [.2, combatPose({ crouch: 12, lean: -12, rootShift: -10, frontFoot: combatPoint(20, 54), frontKnee: -1, frontHand: combatPoint(28, -12) })], [.5, combatPose({ lean: -17, rootShift: 306, frontFoot: combatPoint(142, 20), frontKnee: -1, frontHand: combatPoint(18, -14), rearHand: combatPoint(-2, -5) })], [.78, combatPose({ lean: -7, rootShift: 194, frontFoot: combatPoint(65, 66), frontKnee: -1 })], [1, combatPose()]] },
+    attack: { frames: [[0, combatPose()], [.25, combatPose({ crouch: 14, rootShift: -10, frontHand: combatPoint(18, -12) })], [.46, combatPose({ lean: 12, rootShift: 312, frontHand: combatPoint(130, -5), rearHand: combatPoint(16, -12) })], [.78, combatPose({ rootShift: 196, frontHand: combatPoint(70, 0) })], [1, combatPose()]] },
+    counter: { frames: [[0, combatPose()], [.24, combatPose({ crouch: 13, lean: -4, rootShift: -12, frontHand: combatPoint(16, -14) })], [.46, combatPose({ lean: 10, rootShift: 306, frontHand: combatPoint(122, -4), rearHand: combatPoint(8, -12) })], [.76, combatPose({ rootShift: 190, frontHand: combatPoint(68, 0) })], [1, combatPose()]] },
+    block: { frames: [[0, combatPose()], [.2, combatPose({ crouch: 8, lean: -4, frontHand: combatPoint(30, -28), rearHand: combatPoint(15, -35), frontBend: -1 })], [.56, combatPose({ crouch: 13, lean: -10, rootShift: -14, frontHand: combatPoint(30, -38), rearHand: combatPoint(12, -48), frontBend: -1 })], [.82, combatPose({ crouch: 6, frontHand: combatPoint(32, -20), rearHand: combatPoint(18, -25), frontBend: -1 })], [1, combatPose()]] },
+    hit: { frames: [[0, combatPose()], [.28, combatPose({ lean: -24, rootShift: -52, headTilt: -18, frontHand: combatPoint(-2, 25), rearHand: combatPoint(-18, 12) })], [.66, combatPose({ crouch: 20, lean: -14, rootShift: -24, headTilt: -8 })], [1, combatPose()]] },
+    defeated: { frames: [[0, combatPose()], [.35, combatPose({ crouch: 18, lean: -15, rootShift: -24, headTilt: -14 })], [.82, combatPose({ crouch: 42, lean: -44, rootShift: -76, headTilt: -34, frontFoot: combatPoint(58, 92), rearFoot: combatPoint(-18, 92) })], [1, combatPose({ crouch: 48, lean: -48, rootShift: -86, headTilt: -42 })]] },
+    spawn: { frames: [[0, combatPose({ crouch: 32, rootShift: -26 })], [.58, combatPose({ crouch: 4, rootShift: 0 })], [1, combatPose()]] }
+  };
+
+  function solveCombatTwoBone(root, target, firstLength, secondLength, bend = 1) {
+    const dx = target.x - root.x;
+    const dy = target.y - root.y;
+    const distance = Math.min(firstLength + secondLength - .01,
+      Math.max(Math.abs(firstLength - secondLength) + .01, Math.hypot(dx, dy)));
+    const baseAngle = Math.atan2(dy, dx);
+    const elbowAngle = Math.acos(Math.min(1, Math.max(-1,
+      (firstLength * firstLength + distance * distance - secondLength * secondLength)
+      / (2 * firstLength * distance))));
+    return {
+      mid: combatPoint(root.x + Math.cos(baseAngle + bend * elbowAngle) * firstLength,
+        root.y + Math.sin(baseAngle + bend * elbowAngle) * firstLength),
+      end: target
+    };
+  }
+
+  function sampleCombatClip(clip, progress) {
+    const frames = clip.frames;
+    let from = frames[0];
+    let to = frames[frames.length - 1];
+    for (let i = 0; i < frames.length - 1; i += 1) {
+      if (progress >= frames[i][0] && progress <= frames[i + 1][0]) {
+        from = frames[i];
+        to = frames[i + 1];
+        break;
+      }
+    }
+    const amount = smoothCombat((progress - from[0]) / Math.max(.0001, to[0] - from[0]));
+    const pose = {};
+    Object.keys(COMBAT_POSE_BASE).forEach((key) => {
+      const a = from[1][key];
+      const b = to[1][key];
+      pose[key] = typeof a === 'number'
+        ? a + (b - a) * amount
+        : mixCombatPoint(a, b, amount);
+    });
+    return pose;
+  }
   const backgroundCanvas = document.createElement('canvas');
   backgroundCanvas.width = canvas.width;
   backgroundCanvas.height = canvas.height;
@@ -80,6 +154,7 @@
     playerAction: null,
     playerActionQueue: [],
     enemyAction: null,
+    enemyNextThinkAt: 0,
     particles: particlePool,
     floatingText: floatingTextPool,
     particleCursor: 0,
@@ -168,6 +243,7 @@
     state.playerAction = null;
     state.playerActionQueue.length = 0;
     state.enemyAction = null;
+    state.enemyNextThinkAt = 0;
     state.pendingWaveAdvanceAt = 0;
     state.scoreSubmitted = false;
     document.body.classList.add('game-active');
@@ -192,6 +268,7 @@
     state.enemyMaxHp = enemy.hp;
     state.enemyHp = enemy.hp;
     state.enemyAction = { type: 'spawn', started: performance.now(), duration: 620 };
+    state.enemyNextThinkAt = performance.now() + 1800 + Math.random() * 1600;
     $('enemyName').textContent = enemy.name;
     state.roundStartedAt = performance.now();
     $('waveText').textContent = `OLEADA ${state.wave + 1}/${ENEMIES.length}`;
@@ -214,6 +291,7 @@
     state.roundStartedAt += pausedFor;
     if (state.playerAction) state.playerAction.started += pausedFor;
     if (state.enemyAction) state.enemyAction.started += pausedFor;
+    if (state.enemyNextThinkAt) state.enemyNextThinkAt += pausedFor;
     if (state.pendingWaveAdvanceAt) state.pendingWaveAdvanceAt += pausedFor;
     state.mode = 'playing';
     $('pausePanel').classList.add('hidden');
@@ -225,6 +303,7 @@
   function returnToMenu() {
     state.mode = 'menu';
     state.typed = '';
+    state.enemyNextThinkAt = 0;
     document.body.classList.remove('game-active');
     $('startPanel').classList.remove('hidden');
     $('pausePanel').classList.add('hidden');
@@ -390,17 +469,38 @@
 
   function enemyAttack(reason = 'timeout') {
     if (state.mode !== 'playing') return;
+    const now = performance.now();
     const damage = reason === 'timeout' ? currentLevel().timeoutDamage : currentLevel().typoDamage;
-    state.playerHp = Math.max(0, state.playerHp - damage);
-    state.combo = 0;
-    state.phraseHadError = true;
+    const canBlock = reason === 'ai' && now < state.wordDeadline;
     state.playerActionQueue.length = 0;
-    state.enemyAction = { type: 'attack', started: performance.now(), duration: 560,
-      impact: { x: PLAYER_X, y: 360, color: currentEnemy().color, amount: 15,
-        label: `-${damage}`, labelX: 440, labelY: 340, labelColor: '#ff5368' } };
-    state.playerAction = { type: 'hit', started: performance.now(), duration: 520, delay: .42 };
-    tone(65, .16, 'square', .06);
-    if (state.playerHp <= 0) finishGame(false);
+    state.enemyAction = {
+      type: 'attack',
+      started: now,
+      duration: 560,
+      impactAt: .46,
+      willBlock: canBlock,
+      impact: {
+        x: PLAYER_X,
+        y: 360,
+        color: canBlock ? '#78c6c2' : currentEnemy().color,
+        amount: canBlock ? 8 : 15,
+        label: canBlock ? 'BLOQUEO' : `-${damage}`,
+        labelX: 440,
+        labelY: 340,
+        labelColor: canBlock ? '#78c6c2' : '#ff5368'
+      }
+    };
+    state.playerAction = {
+      type: canBlock ? 'block' : 'hit',
+      started: now,
+      duration: 520,
+      delay: .42
+    };
+    if (!canBlock) {
+      state.combo = 0;
+      state.phraseHadError = true;
+    }
+    tone(canBlock ? 150 : 65, canBlock ? .08 : .16, canBlock ? 'triangle' : 'square', .06);
     updateUi();
   }
 
@@ -672,131 +772,144 @@
     ctx.globalAlpha = 1;
   }
 
-  function drawStickman(x, groundY, scale, color, facing, action, now, isEnemy = false) {
-    const p = actionProgress(action, now);
-    const type = action?.type;
-    const smooth = (t) => { const v = Math.min(1, Math.max(0, t)); return v * v * (3 - 2 * v); };
-    const windowed = (start, peak, end) => p < peak
-      ? smooth((p - start) / (peak - start))
-      : 1 - smooth((p - peak) / (end - peak));
-    const idle = Math.sin(state.sceneTime * .005 + (isEnemy ? 1.5 : 0));
-    const step = Math.sin(state.sceneTime * .003 + (isEnemy ? 2 : 0));
-    const striking = PLAYER_ATTACK_TYPES.has(type) || ['attack', 'counter'].includes(type);
-    const isKick = type === 'kick';
-    const isKnee = type === 'knee';
-    const peaks = { jab: .38, cross: .42, hook: .48, uppercut: .52, knee: .50, heavy: .47, kick: .47, attack: .46, counter: .46 };
-    const peak = peaks[type] ?? .47;
-    const strike = striking ? windowed(0, peak, .86) : 0;
-    const dash = striking ? windowed(.05, peak, .94) : 0;
-    const reactionDelay = action?.delay ?? 0;
-    const recoil = type === 'hit' ? windowed(reactionDelay, Math.min(reactionDelay + .22, .76), 1) : 0;
-    const fall = type === 'defeated' ? smooth((p - .08) / .72) : 0;
-    const spawn = type === 'spawn' ? 1 - easeOut(p) : 0;
-    const reach = type === 'jab' ? 50 : type === 'heavy' ? 95 : isKick ? 42 : 62;
-    const travelByType = {
-      jab: 370, cross: 370, hook: 360, uppercut: 360, knee: 350,
-      heavy: 335, kick: 330, attack: 335, counter: 335
-    };
-    // El desplazamiento y el brazo o pierna terminan en el cuerpo rival.
-    const travel = travelByType[type] ?? 0;
-    const offsetX = facing * (dash * travel - recoil * 52 - fall * 72);
-    const offsetY = -spawn * 120 - ((isKick || isKnee) ? Math.sin(p * Math.PI) * 13 : 0) + recoil * 10 + fall * 76 + idle * (striking ? .4 : 1.8);
-    const lean = strike * ((isKick || isKnee) ? -.18 : .17) - recoil * .42 - fall * 1.15 + idle * .018;
-    const crouch = striking ? windowed(0, .19, .43) * 13 : 0;
+  function combatPoseAt(action, now, isEnemy) {
+    const idle = Math.sin(state.sceneTime * .004 + (isEnemy ? 1.5 : 0));
+    const breath = Math.sin(state.sceneTime * .0027 + (isEnemy ? 2.2 : 0));
+    const relaxed = combatPose({
+      bob: idle * 2.2,
+      crouch: Math.max(0, -idle) * 2,
+      lean: breath * 1.2,
+      frontHand: combatPoint(45 + idle * 3, 8 - breath * 2),
+      rearHand: combatPoint(24 - idle * 2, -3 + breath * 2),
+      frontFoot: combatPoint(38 + idle * 2, 92),
+      rearFoot: combatPoint(-38 - idle * 2, 92)
+    });
+    if (!action) return relaxed;
+    const clip = COMBAT_CLIPS[action.type] || COMBAT_CLIPS.jab;
+    const sampled = sampleCombatClip(clip, actionProgress(action, now));
+    sampled.bob += idle * .45;
+    sampled.lean += breath * .35;
+    return sampled;
+  }
 
+  function drawCombatLimb(points, color, width, alpha = 1) {
     ctx.save();
-    ctx.translate(x + offsetX, groundY + offsetY);
-    ctx.scale(scale * facing, scale);
-    ctx.rotate(lean);
+    ctx.globalAlpha = alpha;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#11171c';
+    ctx.lineWidth = width + 5;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
+    ctx.stroke();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.stroke();
+    ctx.restore();
+  }
 
+  function drawCombatHeadgear(head, scale, facing, isEnemy) {
+    const bandColor = isEnemy ? '#d2aa45' : '#a83e39';
+    const backX = head.x - facing * 27 * scale;
+    ctx.strokeStyle = '#11171c';
+    ctx.lineWidth = 12 * scale;
+    ctx.beginPath();
+    ctx.moveTo(head.x - 25 * scale, head.y - 8 * scale);
+    ctx.lineTo(head.x + 25 * scale, head.y - 8 * scale);
+    ctx.stroke();
+    ctx.strokeStyle = bandColor;
+    ctx.lineWidth = 7 * scale;
+    ctx.stroke();
+    ctx.lineWidth = 5 * scale;
+    ctx.beginPath();
+    ctx.moveTo(backX, head.y - 8 * scale);
+    ctx.quadraticCurveTo(backX - facing * 18 * scale, head.y - 3 * scale,
+      backX - facing * 32 * scale, head.y + 5 * scale);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(backX, head.y - 7 * scale);
+    ctx.quadraticCurveTo(backX - facing * 17 * scale, head.y - 17 * scale,
+      backX - facing * 34 * scale, head.y - 14 * scale);
+    ctx.stroke();
+  }
+
+  function drawStickman(x, groundY, scale, color, facing, action, now, isEnemy = false) {
+    const type = action?.type;
+    const pose = combatPoseAt(action, now, isEnemy);
+    const size = scale * (isEnemy ? 1.03 : 1);
+    const idleShift = action ? 0 : Math.sin(state.sceneTime * .0008 + (isEnemy ? 2 : 0)) * 7;
+    const rootX = x + facing * pose.rootShift + idleShift;
+    const hip = combatPoint(rootX, groundY - 92 * size + pose.crouch - pose.bob);
+    const leanX = facing * pose.lean * .72;
+    const shoulder = combatPoint(hip.x + leanX, hip.y - 76 * size);
+    const neck = combatPoint(shoulder.x + leanX * .2, shoulder.y - 12 * size);
+    const head = combatPoint(neck.x + facing * pose.headTilt * .24, neck.y - 27 * size);
+    const frontHand = combatPoint(shoulder.x + facing * pose.frontHand.x * size,
+      shoulder.y + pose.frontHand.y * size);
+    const rearHand = combatPoint(shoulder.x + facing * pose.rearHand.x * size,
+      shoulder.y + pose.rearHand.y * size);
+    const frontFoot = combatPoint(hip.x + facing * pose.frontFoot.x * size,
+      groundY + (pose.frontFoot.y - 92) * size);
+    const rearFoot = combatPoint(hip.x + facing * pose.rearFoot.x * size,
+      groundY + (pose.rearFoot.y - 92) * size);
+    const frontArm = solveCombatTwoBone(shoulder, frontHand, 42 * size, 43 * size, pose.frontBend * facing);
+    const rearArm = solveCombatTwoBone(shoulder, rearHand, 42 * size, 43 * size, pose.rearBend * facing);
+    const frontLeg = solveCombatTwoBone(hip, frontFoot, 51 * size, 51 * size, -pose.frontKnee * facing);
+    const rearLeg = solveCombatTwoBone(hip, rearFoot, 51 * size, 51 * size, -pose.rearKnee * facing);
+
+    ctx.save();
     ctx.globalAlpha = .22;
-    ctx.beginPath(); ctx.ellipse(0, 5, 50, 10, 0, 0, Math.PI * 2); ctx.fillStyle = '#05080a'; ctx.fill();
+    ctx.fillStyle = '#05080a';
+    ctx.beginPath();
+    ctx.ellipse(hip.x, groundY + 7, 52 * size, 10 * size, 0, 0, Math.PI * 2);
+    ctx.fill();
     ctx.globalAlpha = 1;
 
-    const hip = { x: -crouch * .3, y: -92 + crouch };
-    const chest = { x: 2 + strike * 8, y: -165 + crouch * .55 };
-    const head = { x: 2 + strike * 7, y: -210 + crouch * .4 };
-    const frontFoot = {
-      x: 43 + (isKick ? strike * 116 : 0) + (isKnee ? strike * 70 : 0) + step * 3,
-      y: -4 - (isKick ? strike * 67 : 0) - (isKnee ? strike * 82 : 0)
-    };
-    const backFoot = { x: -43 - dash * 16 - step * 3, y: -4 };
-    const alternating = type === 'jab' && action.alternate;
-    let frontElbow = { x: 28 + strike * reach * .42, y: -159 + crouch * .3 };
-    let backElbow = { x: -22 + (alternating ? strike * 23 : 0), y: -151 + crouch * .3 };
-    let frontHand = { x: 46 + (alternating ? strike * 8 : strike * reach) + idle * 4, y: -146 - strike * 10 + idle * 4 };
-    let backHand = { x: -29 + (alternating ? strike * 112 : strike * 18), y: -142 - (alternating ? strike * 14 : 0) - idle * 4 };
-
-    if (type === 'cross') {
-      frontElbow = { x: 12, y: -146 };
-      frontHand = { x: 30, y: -132 };
-      backElbow = { x: 24 + strike * 42, y: -160 };
-      backHand = { x: -18 + strike * 142, y: -156 };
-    } else if (type === 'hook') {
-      frontElbow = { x: 33 + strike * 42, y: -176 };
-      frontHand = { x: 48 + strike * 80, y: -150 + strike * 24 };
-    } else if (type === 'uppercut') {
-      frontElbow = { x: 34 + strike * 34, y: -138 - strike * 34 };
-      frontHand = { x: 44 + strike * 72, y: -130 - strike * 92 };
-    } else if (isKnee) {
-      frontElbow = { x: 36, y: -164 };
-      frontHand = { x: 58, y: -150 };
-    }
-
-    const drawLimb = (...points) => {
-      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y);
-      points.slice(1).forEach((point) => ctx.lineTo(point.x, point.y));
-      ctx.strokeStyle = '#11171c'; ctx.lineWidth = 13; ctx.stroke();
-      ctx.strokeStyle = color; ctx.lineWidth = 8; ctx.stroke();
-    };
-
-    drawLimb(hip, { x: -20 - dash * 7, y: -49 + crouch * .6 }, backFoot);
-    drawLimb(hip, {
-      x: 26 + (isKick ? strike * 36 : 0) + (isKnee ? strike * 58 : 0),
-      y: -50 - (isKick ? strike * 41 : 0) - (isKnee ? strike * 68 : 0)
-    }, frontFoot);
-    drawLimb(hip, chest);
-    drawLimb(chest, backElbow, backHand);
-    drawLimb(chest, frontElbow, frontHand);
-    if (striking && !isKick && strike > .2) {
-      const fist = type === 'cross' || alternating ? backHand : frontHand;
-      ctx.beginPath(); ctx.arc(fist.x, fist.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.fill();
-    }
-
-    if (striking && strike > .45) {
-      const endpoint = isKick || isKnee ? frontFoot : (type === 'cross' ? backHand : frontHand);
-      ctx.save();
-      ctx.globalAlpha = Math.min(.2, strike * .2);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(endpoint.x - 34, endpoint.y + 3);
-      ctx.lineTo(endpoint.x - 8, endpoint.y);
-      ctx.stroke();
-      ctx.restore();
-    }
+    const lineWidth = 8.5 * size;
+    drawCombatLimb([hip, rearLeg.mid, rearLeg.end], color, lineWidth, .82);
+    drawCombatLimb([shoulder, rearArm.mid, rearArm.end], color, lineWidth, .82);
+    drawCombatLimb([hip, shoulder], color, lineWidth + 2);
+    drawCombatLimb([shoulder, neck], color, lineWidth * .72);
+    drawCombatLimb([hip, frontLeg.mid, frontLeg.end], color, lineWidth);
+    drawCombatLimb([shoulder, frontArm.mid, frontArm.end], color, lineWidth);
 
     ctx.fillStyle = color;
     ctx.strokeStyle = '#11171c';
-    ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(head.x, head.y, 29, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-
-    // La cinta cruza la frente; el nudo y las dos puntas salen detrás de la cabeza.
-    const bandColor = isEnemy ? '#e2b44a' : '#b53d3d';
-    ctx.strokeStyle = '#11171c'; ctx.lineWidth = 11;
-    ctx.beginPath(); ctx.moveTo(head.x - 27, head.y - 10); ctx.lineTo(head.x + 26, head.y - 9); ctx.stroke();
-    ctx.strokeStyle = bandColor; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.moveTo(head.x - 28, head.y - 10); ctx.lineTo(head.x + 27, head.y - 9); ctx.stroke();
-    ctx.beginPath(); ctx.arc(head.x - 27, head.y - 10, 4, 0, Math.PI * 2); ctx.fillStyle = bandColor; ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.moveTo(head.x - 29, head.y - 10); ctx.lineTo(head.x - 48, head.y - 7 + idle * 3 - dash * 9); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(head.x - 29, head.y - 10); ctx.lineTo(head.x - 45, head.y + 1 + idle * 5 - dash * 6); ctx.stroke();
+    ctx.lineWidth = 5 * size;
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 29 * size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    drawCombatHeadgear(head, size, facing, isEnemy);
     ctx.fillStyle = '#11171c';
-    ctx.beginPath(); ctx.arc(head.x + 12, head.y + 4, 3, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath();
+    ctx.arc(head.x + facing * 10 * size, head.y - 1 * size, 3.3 * size, 0, Math.PI * 2);
+    ctx.fill();
+
+    const striking = PLAYER_ATTACK_TYPES.has(type) || ['attack', 'counter'].includes(type);
+    if (striking && actionProgress(action, now) > .2) {
+      const endpoint = ['kick', 'knee'].includes(type)
+        ? frontLeg.end
+        : type === 'cross' ? rearArm.end : frontArm.end;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#11171c';
+      ctx.lineWidth = 3 * size;
+      ctx.beginPath();
+      ctx.arc(endpoint.x, endpoint.y, 6 * size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      if (actionProgress(action, now) > .45) {
+        ctx.globalAlpha = .24;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3 * size;
+        ctx.beginPath();
+        ctx.moveTo(endpoint.x - facing * 42 * size, endpoint.y + 5 * size);
+        ctx.lineTo(endpoint.x - facing * 10 * size, endpoint.y);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
     ctx.restore();
   }
 
@@ -845,16 +958,28 @@
       createImpact(hit.x, hit.y, hit.color, hit.amount);
       if (hit.label) addFloat(hit.label, hit.labelX, hit.labelY, hit.labelColor);
       const lightStrike = LETTER_ATTACKS.some((attack) => attack.type === action.type);
-      state.shake = lightStrike ? 2.2 : action.type === 'kick' ? 12 : 8;
-      state.flash = lightStrike ? .055 : .32;
+      state.shake = action.type === 'attack' && action.willBlock
+        ? 2.5
+        : lightStrike ? 2.2 : action.type === 'kick' ? 12 : 8;
+      state.flash = action.type === 'attack' && action.willBlock ? .08 : lightStrike ? .055 : .32;
       action.impactDone = true;
+      if (action === state.enemyAction && action.type === 'attack' && !action.willBlock) {
+        const damage = action.impact.label ? Number(String(action.impact.label).replace(/[^0-9]/g, '')) : currentLevel().timeoutDamage;
+        state.playerHp = Math.max(0, state.playerHp - (damage || currentLevel().timeoutDamage));
+        state.combo = 0;
+        state.phraseHadError = true;
+        if (state.playerHp <= 0) finishGame(false);
+        updateUi();
+      }
       if (action === state.playerAction) {
-        state.enemyAction = {
-          type: action.reaction || 'hit',
-          started: now,
-          duration: action.sentenceComplete ? 900 : 360,
-          delay: action.sentenceComplete ? .08 : 0
-        };
+        if (!state.enemyAction || state.enemyAction.type !== 'attack') {
+          state.enemyAction = {
+            type: action.reaction || 'hit',
+            started: now,
+            duration: action.sentenceComplete ? 900 : 360,
+            delay: action.sentenceComplete ? .08 : 0
+          };
+        }
         if (action.sentenceComplete) {
           addFloat('¡FRASE COMPLETA!', 640, 250, '#ffd35a');
           if (state.healProgress >= currentLevel().healEvery) {
@@ -868,7 +993,12 @@
         }
       }
     }
-    if (now >= state.wordDeadline && state.enemyHp > 0) {
+    if (state.enemyHp > 0 && !state.enemyAction && !state.pendingWaveAdvanceAt
+      && state.enemyNextThinkAt && now >= state.enemyNextThinkAt) {
+      enemyAttack('ai');
+      state.enemyNextThinkAt = now + 2800 + Math.random() * 2200;
+    }
+    if (now >= state.wordDeadline && state.enemyHp > 0 && !state.enemyAction && !state.pendingWaveAdvanceAt) {
       enemyAttack('timeout');
       resetWordDeadline(now);
     }

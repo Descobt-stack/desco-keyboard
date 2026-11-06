@@ -25,9 +25,11 @@ Cada nivel tiene cinco secciones de diez frases. Los primeros cuatro no usan ace
 
 Mis movimientos son `jab`, `cross`, `hook`, `uppercut`, `knee`, `heavy` y `kick`. Cada acción define duración, momento de impacto y altura de contacto. La reacción del rival empieza exactamente cuando la acción alcanza `impactAt`.
 
+Las poses viven en `COMBAT_CLIPS`. Interpolo cadera, manos y pies y luego resuelvo los dos huesos de cada brazo o pierna. Así puedo cambiar la complexión, añadir casco o máscara más adelante sin reescribir cada fotograma. `enemyNextThinkAt` añade ataques autónomos espaciados y `block` protege al jugador mientras la palabra todavía está dentro de su límite.
+
 ## Renderizado
 
-`drawStickman()` construye cada personaje con articulaciones, líneas y círculos. El escenario se guarda en un canvas auxiliar; en cada cuadro dibujo únicamente personajes, polvo y efectos. Reutilizo partículas y textos flotantes, limito el render a 60 FPS y dejo de dibujar cuando la pestaña está oculta.
+`drawStickman()` construye cada personaje con articulaciones, líneas y círculos. El escenario se guarda en un canvas auxiliar; en cada cuadro dibujo únicamente personajes, polvo y efectos. Reutilizo partículas y textos flotantes, limito el render a 60 FPS y dejo de dibujar cuando la pestaña está oculta. El daño se aplica en el mismo `impactAt` que la pose de contacto, no al comenzar la animación.
 
 ## Frases completas
 
@@ -37,7 +39,7 @@ La frase usa un contenedor flexible con salto de línea. Cada palabra es una uni
 
 El navegador envía nombre, nivel, PPM, precisión y vida restante. El Worker valida rangos, vuelve a calcular la puntuación y guarda solo la mejor marca de cada nombre por nivel. D1 usa una restricción única sobre nombre normalizado y nivel. Si el servicio no responde, conservo una tabla local temporal.
 
-La tabla no usa contraseñas ni publica correos. Es un tablero casual; una futura fase puede añadir identidad y verificación más fuerte contra puntuaciones manipuladas.
+La tabla no usa contraseñas ni publica correos. El Worker además limita el origen, el tamaño del JSON y los envíos repetidos. Es un tablero casual; una futura fase puede añadir identidad y verificación más fuerte contra puntuaciones manipuladas.
 
 ## Publicación doble
 
