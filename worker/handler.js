@@ -199,9 +199,14 @@ async function resolvePlayerIdentity(env, level, name, normalizedName, deviceId)
   const result = await env.DB.prepare(
     `SELECT id, player_name, normalized_name, score
      FROM scores
-     WHERE level = ? AND (normalized_name = ? OR normalized_name LIKE ?)`
-  ).bind(level, normalizedName, `${normalizedName}::%`).all();
-  const rows = result.results || [];
+     WHERE level = ?`
+  ).bind(level).all();
+  const rows = (result.results || []).filter((row) => {
+    const storedKey = String(row.normalized_name || '');
+    return storedKey === normalizedName
+      || storedKey.startsWith(`${normalizedName}::`)
+      || normalizeName(String(row.player_name || '')) === normalizedName;
+  });
   const sameDevice = rows.find((row) => row.normalized_name === deviceKey);
   if (sameDevice) {
     return { key: deviceKey, displayName: sameDevice.player_name, legacyId: null };
@@ -209,7 +214,8 @@ async function resolvePlayerIdentity(env, level, name, normalizedName, deviceId)
 
   // La primera sesión que vuelva a usar un nombre histórico reclama esa fila.
   // Así conservo la marca existente sin crear un duplicado para el mismo jugador.
-  const legacy = rows.find((row) => row.normalized_name === normalizedName);
+  const legacy = rows.find((row) => !String(row.normalized_name || '').includes('::')
+    && (row.normalized_name === normalizedName || normalizeName(String(row.player_name || '')) === normalizedName));
   if (legacy) {
     return { key: deviceKey, displayName: name, legacyId: Number(legacy.id) };
   }
