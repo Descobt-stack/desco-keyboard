@@ -504,7 +504,9 @@
   }
 
   function getRank() {
-    return scoreGrade(getScore(), currentLevel().number);
+    const performanceScore = scoreFor(currentLevel().number, getWpm(), getAccuracy(), state.playerHp,
+      state.bestCombo, state.correctKeys, 100, true);
+    return scoreGrade(performanceScore, currentLevel().number);
   }
 
   function createImpact(x, y, color, amount = 12) {
